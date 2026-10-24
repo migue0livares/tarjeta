@@ -621,8 +621,22 @@ const etiqueta=(m,prog)=>prog?'Pago programado'
   :(m.auto?'Suscripción':(m.q===1?'1 cuota':m.q+' cuotas'));
 /* el banco cobra interés sobre las cuotas: si se conoce el valor real se usa ese */
 const valorCuota=m=>m.cu||Math.round(m.a/m.q);
-/* una compra en cuotas empieza a cobrarse en el ciclo SIGUIENTE al de la compra */
-const cuotasDe=r=>MOVS.filter(m=>m.q>1 && aFecha(m.d)<r.ini).reduce((s,m)=>s+valorCuota(m),0);
+/* ciclo al que pertenece una fecha: devuelve su día de inicio */
+function cicloIniDe(f){
+  return f.getDate()>CORTE
+    ? new Date(f.getFullYear(),f.getMonth(),CORTE+1)
+    : new Date(f.getFullYear(),f.getMonth()-1,CORTE+1);
+}
+/* número de cuota que corresponde a una compra en un ciclo dado.
+   La cuota 1 cae en el ciclo SIGUIENTE al de la compra, y se acaba en la cuota q. */
+function nroCuota(m,r){
+  if(!m.q||m.q<2) return 0;
+  const o=cicloIniDe(aFecha(m.d));
+  const n=(r.ini.getFullYear()-o.getFullYear())*12 + (r.ini.getMonth()-o.getMonth());
+  return (n>=1 && n<=m.q) ? n : 0;
+}
+const cuotasVivas=r=>MOVS.filter(m=>nroCuota(m,r)>0);
+const cuotasDe=r=>cuotasVivas(r).reduce((s,m)=>s+valorCuota(m),0);
 const cuotaMensual=()=>cuotasDe(ciclos().act);
 
 /* cuánto se paga el día 1 de un mes: el ciclo que cerró el 15 anterior */
@@ -1045,7 +1059,7 @@ function verDia(fISO){
     const r={ini,fin};
     const compras=facturable(MOVS.filter(m=>enRango(m.d,r)));
     const cuo=cuotasDe(r);
-    const cuotasDet=MOVS.filter(m=>m.q>1 && aFecha(m.d)<r.ini);
+    const cuotasDet=cuotasVivas(r);
     const dd=dias(f,hoy());
     document.getElementById('detBody').innerHTML=`
       <div class="det" style="padding-bottom:2px">
@@ -1056,7 +1070,7 @@ function verDia(fISO){
         <span class="st pr">${dd>0?`Faltan ${plural(dd,'día','días')}`:dd===0?'Es hoy':`Fue hace ${plural(-dd,'día','días')}`}</span></div>
       <div class="dl">
         <div class="dr"><span>Compras del ciclo</span><span>${CLP(compras)}</span></div>
-        ${cuotasDet.map(m=>`<div class="dr"><span>Cuota de ${m.t}</span><span>${CLP(valorCuota(m))}</span></div>`).join('')}
+        ${cuotasDet.map(m=>`<div class="dr"><span>${m.t} · cuota ${nroCuota(m,r)} de ${m.q}</span><span>${CLP(valorCuota(m))}</span></div>`).join('')}
         <div class="dr"><span>Total a pagar</span><span>${CLP(pagar)}</span></div></div>
       ${cuo?`<p class="nota" style="margin-top:14px">Las compras en cuotas se empiezan a cobrar en el ciclo siguiente al de la compra, no en el mismo.</p>`:''}
       <button class="btn ${estaPagado(fin)?'':'dark'}" id="dPagado"
