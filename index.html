@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lider Bci">
-<title>Control tarjeta Lider Bci</title>
+<title>Control tarjeta Lider Bci · Versión 2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -302,6 +302,17 @@ select.inp{appearance:none;-webkit-appearance:none;
  background-image:linear-gradient(45deg,transparent 50%,var(--fnt) 50%),linear-gradient(135deg,var(--fnt) 50%,transparent 50%);
  background-position:calc(100% - 20px) 25px,calc(100% - 15px) 25px;background-size:5px 5px;background-repeat:no-repeat}
 .fila2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.hora{position:relative}
+.hora .inp{padding-right:42px}
+.hora button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;
+ border-radius:10px;color:var(--fnt);font-size:15px;font-weight:800;display:grid;place-items:center}
+.hora button:active{background:var(--press)}
+.upd{position:fixed;left:16px;right:16px;top:calc(12px + env(safe-area-inset-top));max-width:398px;
+ margin:0 auto;z-index:95;background:var(--panel);color:#fff;border-radius:20px;padding:12px 12px 12px 18px;
+ display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px var(--sombra);font-size:13.5px;font-weight:700}
+.upd span{flex:1;min-width:0}
+.upd button{background:var(--mint);color:var(--mint-ink);padding:10px 16px;border-radius:14px;
+ font-size:13px;font-weight:800;flex:none}
 .tgl{width:100%;margin-top:9px;background:var(--card);border-radius:18px;padding:15px 16px;
  display:flex;align-items:center;gap:13px;text-align:left;font-size:13.5px;font-weight:600}
 .tgl .bx{width:24px;height:24px;border-radius:8px;border:2px solid var(--line);flex:none;
@@ -350,10 +361,14 @@ select.inp{appearance:none;-webkit-appearance:none;
     <select class="inp" id="aCat"></select>
     <button class="tgl" id="aAuto" aria-pressed="false">
       <span class="bx">✓</span><span id="aAutoTx">Es un pago automático que se repite cada mes</span></button>
-    <p class="paso" id="aPasoF">Fecha y cuotas</p>
-    <div class="fila2" id="aFila">
-      <input type="date" class="inp" id="aFec">
-      <select class="inp" id="aCuo">
+    <p class="paso" id="aPasoF">Fecha, hora y cuotas</p>
+    <div id="aFila">
+      <div class="fila2">
+        <input type="date" class="inp" id="aFec" aria-label="Fecha">
+        <div class="hora"><input type="time" class="inp" id="aHor" aria-label="Hora (opcional)">
+          <button type="button" id="aHorX" aria-label="Quitar hora">✕</button></div>
+      </div>
+      <select class="inp" id="aCuo" style="margin-top:9px">
         <option value="1">1 cuota</option><option value="3">3 cuotas</option>
         <option value="6">6 cuotas</option><option value="10">10 cuotas</option>
         <option value="12">12 cuotas</option><option value="24">24 cuotas</option>
@@ -371,6 +386,8 @@ select.inp{appearance:none;-webkit-appearance:none;
   </div></div></div>
 
 <div class="toast" id="toast"></div>
+<div class="upd hidden" id="upd"><span id="updTx">Hay una versión nueva de la app</span>
+  <button id="updOk">Actualizar</button></div>
 
 <script>
 'use strict';
@@ -618,6 +635,9 @@ const etiqueta=(m,prog)=>prog?'Pago programado'
   :(m.auto?'Suscripción':(m.q===1?'1 cuota':m.q+' cuotas'));
 /* el banco cobra interés sobre las cuotas: si se conoce el valor real se usa ese */
 const valorCuota=m=>m.cu||Math.round(m.a/m.q);
+/* orden cronológico: fecha y, si existe, hora. Las compras sin hora quedan al final del día */
+const claveOrden=m=>m.d+' '+(m.h||'');
+const ahoraHM=()=>{const d=new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
 /* ciclo al que pertenece una fecha: devuelve su día de inicio */
 function cicloIniDe(f){
   return f.getDate()>CORTE
@@ -664,14 +684,14 @@ function filaMov(m,idx,prog){
   const c=cat(m.c);
   return `<button class="mv${prog?' prog':''}" ${prog?'':`data-i="${idx}"`}>
     <span class="ic" style="background:${c.col}">${c.em}</span>
-    <span class="i"><b>${m.t}</b><span class="f">${fLargo(m.d)}</span><span class="c">${c.nm}</span></span>
+    <span class="i"><b>${m.t}</b><span class="f">${fLargo(m.d)}${m.h?` · ${m.h}`:''}</span><span class="c">${c.nm}</span></span>
     <span class="r"><b>${CLP(m.a)}</b><span>${etiqueta(m,prog)}</span></span>
   </button>`;
 }
 
 function home(){
   const E=estado();
-  const ordena=l=>l.map(m=>MOVS.indexOf(m)).sort((a,b)=>MOVS[b].d.localeCompare(MOVS[a].d));
+  const ordena=l=>l.map(m=>MOVS.indexOf(m)).sort((a,b)=>claveOrden(MOVS[b]).localeCompare(claveOrden(MOVS[a])));
   const iAct=ordena(E.act), iAnt=ordena(E.ant);
   const listo=E.hechas>=META;
   const pagadoAnt=estaPagado(E.C.ant.fin);
@@ -803,12 +823,12 @@ function timeline(){
   const it=(m,idx,gris)=>{const c=cat(m.c);
     return `<button class="it${gris?' gris':''}" ${gris?'':`data-i="${idx}"`}>
       <span class="ic" style="background:${c.col}">${c.em}</span>
-      <span class="k"><b>${m.t}</b><span>${c.nm}</span></span>
+      <span class="k"><b>${m.t}</b><span>${m.h?m.h+' · ':''}${c.nm}</span></span>
       <span class="v"><b>${CLP(m.a)}</b><span>${etiqueta(m,gris)}</span></span></button>`};
   const bloque=(lista,gris)=>{
     const fechas=[...new Set(lista.map(m=>m.d))].sort().reverse();
     return fechas.map(f=>{
-      const g=lista.filter(m=>m.d===f), d=aFecha(f);
+      const g=lista.filter(m=>m.d===f).sort((a,b)=>(b.h||'').localeCompare(a.h||'')), d=aFecha(f);
       return `<div class="dia${gris?' gris':''}${iso(d)===iso(hoy())?' hoy':''}">
         <span class="fe"><span class="n">${d.getDate()}</span>
           <span class="m">${MES[d.getMonth()].slice(0,3)}</span>
@@ -872,7 +892,9 @@ function verDetalle(i){
   const m=MOVS[i], c=cat(m.c), E=estado();
   const f=aFecha(m.d);
   const facturado = f<=E.C.ant.fin;
-  const rows=[['Fecha',fLargo(m.d)],['Categoría',c.nm]];
+  const rows=[['Fecha',fLargo(m.d)]];
+  if(m.h) rows.push(['Hora',m.h]);
+  rows.push(['Categoría',c.nm]);
   if(m.q>1){
     rows.push(['Cuotas',`${m.q} de ${CLP(valorCuota(m))}`]);
     const total=valorCuota(m)*m.q;
@@ -887,7 +909,7 @@ function verDetalle(i){
     : `${E.C.act.vence.getDate()} de ${MES[E.C.act.vence.getMonth()]}`]);
   document.getElementById('detBody').innerHTML=`
     <div class="det"><div class="ic" style="background:${c.col}">${c.em}</div>
-      <h2>${m.t}</h2><div class="f">${fLargo(m.d)}</div>
+      <h2>${m.t}</h2><div class="f">${fLargo(m.d)}${m.h?` · ${m.h}`:''}</div>
       <div class="mo num">${CLP(m.a)}</div>
       <span class="st ${facturado?'ok':'pr'}">${facturado?'Ya facturada':'Por facturar'}</span></div>
     <div class="dl">${rows.map(r=>`<div class="dr"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('')}</div>
@@ -907,12 +929,22 @@ const elGua=document.getElementById('aGuardar');
 const elNota=document.getElementById('aNota');
 const elAuto=document.getElementById('aAuto');
 const elDia=document.getElementById('aDia');
+const elHor=document.getElementById('aHor');
+/* la hora se autocompleta solo mientras no la toques tú y la fecha sea hoy */
+let aHorTocada=false;
+function horaPorDefecto(){
+  if(aHorTocada) return;
+  elHor.value = elFec.value===iso(hoy()) ? ahoraHM() : '';
+}
+elHor.addEventListener('input',()=>{aHorTocada=true});
+elFec.addEventListener('input',horaPorDefecto);
+document.getElementById('aHorX').onclick=()=>{elHor.value='';aHorTocada=true};
 elDia.innerHTML=Array.from({length:31},(_,i)=>`<option value="${i+1}">Día ${i+1}</option>`).join('');
 elAuto.onclick=()=>{
   aAuto=!aAuto; elAuto.setAttribute('aria-pressed',aAuto);
   document.getElementById('aFila').classList.toggle('hidden',aAuto);
   document.getElementById('aFilaDia').classList.toggle('hidden',!aAuto);
-  document.getElementById('aPasoF').textContent = aAuto?'Qué día cobra':'Fecha y cuotas';
+  document.getElementById('aPasoF').textContent = aAuto?'Qué día cobra':'Fecha, hora y cuotas';
   revisarAlta();
 };
 
@@ -961,13 +993,14 @@ function modoAuto(on){
   aAuto=on; elAuto.setAttribute('aria-pressed',on);
   document.getElementById('aFila').classList.toggle('hidden',on);
   document.getElementById('aFilaDia').classList.toggle('hidden',!on);
-  document.getElementById('aPasoF').textContent = on?'Qué día cobra':'Fecha y cuotas';
+  document.getElementById('aPasoF').textContent = on?'Qué día cobra':'Fecha, hora y cuotas';
 }
 function nuevaCompra(auto){
   aEdit=null; aSus=null; aMonto=0;
   document.getElementById('addTit').textContent=auto?'Nuevo pago automático':'Nueva compra';
   elVal.textContent='0'; elVal.classList.add('cero');
   elDet.value=''; elCat.value=''; elCuo.value='1'; elFec.value=iso(hoy());
+  aHorTocada=false; horaPorDefecto();
   elDia.value=String(hoy().getDate()); document.getElementById('aDesde').value=iso(hoy());
   modoAuto(!!auto);
   document.getElementById('aBorrar').classList.add('hidden');
@@ -990,6 +1023,7 @@ function editar(i){
   document.getElementById('addTit').textContent='Editar compra';
   elVal.textContent=aMonto.toLocaleString('es-CL'); elVal.classList.toggle('cero',aMonto===0);
   elDet.value=m.t; elCat.value=m.c; elCuo.value=String(m.q); elFec.value=m.d;
+  elHor.value=m.h||''; aHorTocada=true;
   modoAuto(false);
   document.getElementById('aBorrar').classList.remove('hidden');
   revisarAlta(); abrir('shAdd');
@@ -1007,8 +1041,10 @@ elGua.onclick=()=>{
   }
   const reg={c:elCat.value, t:elDet.value.trim(), d:elFec.value||iso(hoy()),
     a:aMonto, q:+elCuo.value, n:0};
+  if(elHor.value) reg.h=elHor.value;
   if(aEdit===null){ MOVS.push(reg); aviso('Compra guardada.'); }
   else { reg.n=MOVS[aEdit].n; if(MOVS[aEdit].cu) reg.cu=MOVS[aEdit].cu;
+    if(MOVS[aEdit].auto) reg.auto=1;
     MOVS[aEdit]=reg; aviso('Compra actualizada.'); }
   guardar(); cerrar('shAdd'); paint();
 };
@@ -1083,14 +1119,15 @@ function verDia(fISO){
     };
     return;
   }
-  const reales=MOVS.map((m,i)=>({m,i})).filter(x=>x.m.d===fISO);
+  const reales=MOVS.map((m,i)=>({m,i})).filter(x=>x.m.d===fISO)
+    .sort((a,b)=>(b.m.h||'').localeCompare(a.m.h||''));
   const progs =proyectados().filter(m=>m.d===fISO);
   const total=reales.reduce((s,x)=>s+x.m.a,0)+progs.reduce((s,m)=>s+m.a,0);
   const facturado = f<=E.C.ant.fin;
   const fila=(m,idx,prog)=>{const c=cat(m.c);
     return `<button class="mv${prog?' prog':''}" ${prog?'':`data-i="${idx}"`} style="margin-bottom:8px">
       <span class="ic" style="background:${c.col}">${c.em}</span>
-      <span class="i"><b>${m.t}</b><span class="c">${c.nm}</span></span>
+      <span class="i"><b>${m.t}</b><span class="c">${m.h?m.h+' · ':''}${c.nm}</span></span>
       <span class="r"><b>${CLP(m.a)}</b><span>${etiqueta(m,prog)}</span></span></button>`};
   const esPago = f.getDate()===1, esCorte = f.getDate()===CORTE;
   document.getElementById('detBody').innerHTML=`
@@ -1298,8 +1335,38 @@ async function arrancar(){
   pintarNube(); paint();
 }
 
+/* ─────────── aviso de versión nueva ───────────
+   La versión vive en el <title>. Se descarga el index.html publicado
+   sin usar la caché y se compara el número. */
+const verDe=t=>{const x=/Versi\u00f3n\s+(\d+)/.exec(t||'');return x?+x[1]:0};
+const VERSION=verDe(document.title);
+let ultRevision=0, versionNueva=0;
+async function revisarVersion(){
+  if(!VERSION||location.protocol==='file:') return;
+  if(Date.now()-ultRevision<60000) return;
+  ultRevision=Date.now();
+  try{
+    const r=await fetch(location.origin+location.pathname+'?nv='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;
+    const t=await r.text();
+    const tit=/<title>([^<]*)<\/title>/i.exec(t);
+    const v=verDe(tit&&tit[1]);
+    if(v>VERSION){
+      versionNueva=v;
+      document.getElementById('updTx').textContent=`Hay una versión nueva (${v})`;
+      document.getElementById('upd').classList.remove('hidden');
+    }
+  }catch(e){}
+}
+document.getElementById('updOk').onclick=()=>{
+  if(document.querySelector('.sh.on')){ aviso('Cierra la ventana abierta antes de actualizar.'); return; }
+  location.replace(location.pathname+'?v='+versionNueva);
+};
+revisarVersion();
+
 /* al volver a la app, releer por si cambió en otro aparato */
 document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible') revisarVersion();
   if(document.visibilityState!=='visible'||!urlNube()||subiendo) return;
   if(await bajarNube()){ materializar(); paint(); pintarNube(); }
 });
