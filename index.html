@@ -278,6 +278,7 @@ select.inp{appearance:none;-webkit-appearance:none;
 <div class="app">
   <div class="hd"><div><h1 id="hola">Hola</h1><p id="fechaHoy"></p></div>
     <div style="display:flex;align-items:center;gap:10px">
+      <button class="cog" id="bNube" aria-label="Estado de sincronización">☁️</button>
       <button class="cog" id="bCfg" aria-label="Ajustes">⚙️</button>
       <img id="av" alt=""></div></div>
   <div id="stage"></div>
@@ -477,12 +478,60 @@ let semillaMOVS=JSON.parse(JSON.stringify(MOVS));
 let semillaSUSCR=JSON.parse(JSON.stringify(SUSCR));
 let semillaPAG=JSON.parse(JSON.stringify(PAGADOS));
 
+function paquete(){ return {v:2, movs:MOVS, suscr:SUSCR, pagados:PAGADOS}; }
+
 function guardar(){
   try{
-    localStorage.setItem(LLAVE, JSON.stringify({v:2, movs:MOVS, suscr:SUSCR, pagados:PAGADOS,
-      fecha:new Date().toISOString()}));
-    return true;
-  }catch(e){ return false; }
+    localStorage.setItem(LLAVE, JSON.stringify({...paquete(), fecha:new Date().toISOString()}));
+  }catch(e){}
+  subirNube();            // se sube en segundo plano, sin bloquear
+  return true;
+}
+
+/* ─────────── sincronización con Google Sheets ─────────── */
+const LLAVE_URL='liderbci_url';
+let nubeEstado='off';     // off · ok · subiendo · error · pendiente
+let colaSubida=null, subiendo=false;
+
+const urlNube=()=>{ try{ return localStorage.getItem(LLAVE_URL)||''; }catch(e){ return ''; } };
+function setUrlNube(u){
+  try{ u ? localStorage.setItem(LLAVE_URL,u.trim()) : localStorage.removeItem(LLAVE_URL); }catch(e){}
+}
+
+async function bajarNube(){
+  const u=urlNube(); if(!u) return false;
+  try{
+    const r=await fetch(u+'?t='+Date.now(), {method:'GET'});
+    const d=await r.json();
+    if(!d||!Array.isArray(d.movs)) throw new Error('formato');
+    MOVS=d.movs; SUSCR=Array.isArray(d.suscr)?d.suscr:[]; PAGADOS=Array.isArray(d.pagados)?d.pagados:[];
+    try{ localStorage.setItem(LLAVE, JSON.stringify({...paquete(), fecha:new Date().toISOString()})); }catch(e){}
+    nubeEstado='ok'; return true;
+  }catch(e){ nubeEstado='error'; return false; }
+}
+
+async function subirNube(){
+  const u=urlNube(); if(!u){ nubeEstado='off'; pintarNube(); return; }
+  colaSubida=JSON.stringify(paquete());
+  if(subiendo) return;
+  subiendo=true; nubeEstado='subiendo'; pintarNube();
+  while(colaSubida){
+    const cuerpo=colaSubida; colaSubida=null;
+    try{
+      await fetch(u, {method:'POST', body:cuerpo,
+        headers:{'Content-Type':'text/plain;charset=utf-8'}});
+      nubeEstado='ok';
+    }catch(e){ nubeEstado='pendiente'; }
+  }
+  subiendo=false; pintarNube();
+}
+
+function pintarNube(){
+  const el=document.getElementById('bNube'); if(!el) return;
+  const m={off:['☁️','Sin sincronizar'],ok:['✅','Sincronizado'],
+    subiendo:['🔄','Guardando…'],error:['⚠️','Error al leer'],pendiente:['⚠️','Sin conexión']};
+  const [ic,tx]=m[nubeEstado]||m.off;
+  el.textContent=ic; el.title=tx;
 }
 function cargar(){
   try{
@@ -1009,6 +1058,17 @@ function verAjustes(){
       <div class="ic" style="background:#E7EAF2">⚙️</div>
       <h2>Ajustes y respaldo</h2>
       <div class="f">Los datos se guardan solo en este teléfono</div></div>
+    <p class="paso">Sincronización</p>
+    <input type="text" class="inp" id="cfgUrl" placeholder="Pega aquí la URL de tu hoja"
+      value="${urlNube()}" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="fila2" style="margin-top:9px">
+      <button class="btn dark" id="cfgGuardaUrl" style="margin-top:0">Guardar y bajar</button>
+      <button class="btn" id="cfgSubir" style="margin-top:0;background:var(--card);color:var(--ink)">Subir ahora</button>
+    </div>
+    <p class="nota" style="margin-top:11px">${urlNube()
+      ? 'Conectada. Cada cambio se guarda en tu hoja de Google y al abrir la app se lee desde ahí.'
+      : 'Sin conectar. Los datos viven solo en este aparato.'}</p>
+
     <div class="dl" style="margin-top:16px">
       <div class="dr"><span>Compras registradas</span><span>${MOVS.length}</span></div>
       <div class="dr"><span>Pagos automáticos</span><span>${SUSCR.length}</span></div>
@@ -1025,6 +1085,24 @@ function verAjustes(){
     <p class="nota" style="margin-top:14px">Guarda el respaldo en tus notas de vez en cuando.
       Si borras el historial de Safari o desinstalas la app, los datos se pierden.</p>`;
   abrir('shDet');
+
+  document.getElementById('cfgGuardaUrl').onclick=async()=>{
+    const u=document.getElementById('cfgUrl').value.trim();
+    if(u && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)){
+      aviso('Esa no parece la URL correcta. Debe terminar en /exec.'); return;
+    }
+    setUrlNube(u);
+    if(!u){ nubeEstado='off'; pintarNube(); cerrar('shDet'); paint(); aviso('Sincronización desactivada.'); return; }
+    nubeEstado='subiendo'; pintarNube();
+    const ok=await bajarNube();
+    pintarNube(); cerrar('shDet'); paint();
+    aviso(ok?'Conectado. Datos leídos desde tu hoja.':'No se pudo leer. Revisa la URL.');
+  };
+  document.getElementById('cfgSubir').onclick=async()=>{
+    if(!urlNube()){ aviso('Primero pega la URL de tu hoja.'); return; }
+    await subirNube();
+    aviso(nubeEstado==='ok'?'Subido a tu hoja.':'No se pudo subir.');
+  };
 
   document.getElementById('cfgExp').onclick=async()=>{
     const txt=JSON.stringify({v:1,movs:MOVS,suscr:SUSCR});
@@ -1047,6 +1125,7 @@ function verAjustes(){
       const d=JSON.parse(document.getElementById('cfgTa').value.trim());
       if(!Array.isArray(d.movs)) throw 0;
       MOVS=d.movs; SUSCR=Array.isArray(d.suscr)?d.suscr:[];
+      PAGADOS=Array.isArray(d.pagados)?d.pagados:[];
       guardar(); cerrar('shDet'); paint(); aviso('Respaldo restaurado.');
     }catch(e){ aviso('Ese texto no es un respaldo válido.'); }
   };
@@ -1120,11 +1199,26 @@ function aviso(msg){
 
 /* arranque */
 calY=hoy().getFullYear(); calM=hoy().getMonth();
-const habia=cargar();
-const alArrancar=materializar();
-if(alArrancar||!habia) guardar();
+cargar();                       // primero lo local, para que se vea algo al tiro
 paint();
-if(alArrancar) aviso(`Se registraron ${plural(alArrancar,'cargo automático','cargos automáticos')}.`);
+arrancar();
+
+async function arrancar(){
+  if(urlNube()){
+    nubeEstado='subiendo'; pintarNube();
+    const ok=await bajarNube();
+    if(!ok) aviso('No se pudo leer la hoja. Estás viendo la copia local.');
+  } else { nubeEstado='off'; }
+  const n=materializar();
+  if(n){ guardar(); aviso(`Se registraron ${plural(n,'cargo automático','cargos automáticos')}.`); }
+  pintarNube(); paint();
+}
+
+/* al volver a la app, releer por si cambió en otro aparato */
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState!=='visible'||!urlNube()||subiendo) return;
+  if(await bajarNube()){ materializar(); paint(); pintarNube(); }
+});
 </script>
 </body>
 </html>
