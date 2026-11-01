@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lider Bci">
-<title>Control tarjeta Lider Bci · Versión 2</title>
+<title>Control tarjeta Lider Bci · Versión 3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -302,6 +302,8 @@ select.inp{appearance:none;-webkit-appearance:none;
  background-image:linear-gradient(45deg,transparent 50%,var(--fnt) 50%),linear-gradient(135deg,var(--fnt) 50%,transparent 50%);
  background-position:calc(100% - 20px) 25px,calc(100% - 15px) 25px;background-size:5px 5px;background-repeat:no-repeat}
 .fila2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.cl[data-det]{cursor:pointer}
+.cl[data-det]:active{background:var(--press)}
 .hora{position:relative}
 .hora .inp{padding-right:42px}
 .hora button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;
@@ -708,7 +710,7 @@ function home(){
     <span class="ln"></span><span class="tot">${CLP(E.deudaAnt)}</span></div>`;
 
   return `<div class="duo">
-    <div class="cl a${pagadoAnt?' ok':''}"><div class="lb">Ciclo anterior</div>
+    <div class="cl a${pagadoAnt?' ok':''}" data-det="ant"><div class="lb">Ciclo anterior</div>
       <div class="per">${fCorto(E.C.ant.ini)} al ${fCorto(E.C.ant.fin)}</div>
       <div class="mo num">${CLP(E.deudaAnt)}</div>
       <div class="pg">${pagadoAnt
@@ -719,7 +721,7 @@ function home(){
             :`<b${urg?' class="urg"':''}>Faltan ${plural(E.diasPago,'día','días')}</b>`)}</div>
       <button class="marcar${pagadoAnt?' off':''}" id="bPagar">
         ${pagadoAnt?'Desmarcar pago':'Marcar como pagado'}</button></div>
-    <div class="cl b"><div class="lb">Ciclo actual</div>
+    <div class="cl b" data-det="act"><div class="lb">Ciclo actual</div>
       <div class="per">${fCorto(E.C.act.ini)} al ${fCorto(E.C.act.fin)}</div>
       <div class="mo num">${CLP(E.deudaAct)}</div>
       <div class="pg">A pagar el<br><b>${E.C.act.vence.getDate()} de ${MES[E.C.act.vence.getMonth()]}</b>
@@ -1061,6 +1063,8 @@ document.getElementById('bAdd').onclick=()=>nuevaCompra(false);
 document.getElementById('bCfg').onclick=verAjustes;
 
 document.getElementById('stage').addEventListener('click',e=>{
+  const det=e.target.closest('[data-det]');
+  if(det && !e.target.closest('#bPagar')){ verDeuda(det.dataset.det); return; }
   if(e.target.closest('#bPagar')){
     const k=iso(ciclos().ant.fin), i=PAGADOS.indexOf(k);
     if(i>=0) PAGADOS.splice(i,1); else PAGADOS.push(k);
@@ -1253,6 +1257,43 @@ function verAjustes(){
   document.getElementById('cfgReset').onclick=()=>{
     restaurarSemilla(); cerrar('shDet'); paint(); aviso('Datos de ejemplo restaurados.');
   };
+}
+
+/* desglose de lo que suma cada tarjeta del inicio */
+function verDeuda(k){
+  const E=estado(), ant=k==='ant', r=ant?E.C.ant:E.C.act;
+  const compras=MOVS.filter(m=>enRango(m.d,r)&&m.q<2)
+    .sort((a,b)=>claveOrden(b).localeCompare(claveOrden(a)));
+  const cuo=cuotasVivas(r);
+  const totC=compras.reduce((s,m)=>s+m.a,0);
+  const totQ=cuo.reduce((s,m)=>s+valorCuota(m),0);
+  const total=totC+totQ;
+  const venc=`${r.vence.getDate()} de ${MES[r.vence.getMonth()]}`;
+  const fila=(nombre,sub,monto)=>`<div class="dr"><span style="color:var(--ink);font-weight:700">${nombre}<br>
+    <small style="color:var(--fnt);font-weight:600">${sub}</small></span><span>${monto}</span></div>`;
+  let nota='';
+  if(ant && cuo.length)
+    nota=`La tarjeta del inicio muestra solo las compras (${CLP(totC)}). Las cuotas se suman el ${venc}, así que el total real es ${CLP(total)}.`;
+  else if(!ant && cuo.length)
+    nota=`La tarjeta del inicio muestra las cuotas aparte, como "+ cuota". Juntas dan ${CLP(total)}.`;
+  document.getElementById('detBody').innerHTML=`
+    <div class="det" style="padding-bottom:2px">
+      <div class="ic" style="background:${ant?'#FFE4E9':'#E2F0EA'}">${ant?'📄':'🧾'}</div>
+      <h2>${ant?'Ciclo anterior':'Ciclo actual'}</h2>
+      <div class="f">${fCorto(r.ini)} al ${fCorto(r.fin)} · se paga el ${venc}</div>
+      <div class="mo num">${CLP(total)}</div>
+      <span class="st pr">${plural(compras.length,'compra','compras')}${cuo.length?` y ${plural(cuo.length,'cuota','cuotas')}`:''}</span></div>
+    <p class="paso">Compras · ${CLP(totC)}</p>
+    <div class="dl">${compras.map(m=>fila(m.t,fLargo(m.d)+(m.auto?' · automático':''),CLP(m.a))).join('')
+      ||'<div class="dr"><span>Sin compras en este ciclo</span><span>$0</span></div>'}</div>
+    ${cuo.length?`<p class="paso">Cuotas · ${CLP(totQ)}</p>
+    <div class="dl">${cuo.map(m=>fila(m.t,`cuota ${nroCuota(m,r)} de ${m.q}`,CLP(valorCuota(m)))).join('')}</div>`:''}
+    <p class="paso">Total a pagar</p>
+    <div class="dl"><div class="dr"><span>Compras</span><span>${CLP(totC)}</span></div>
+      ${cuo.length?`<div class="dr"><span>Cuotas</span><span>${CLP(totQ)}</span></div>`:''}
+      <div class="dr"><span>Total</span><span>${CLP(total)}</span></div></div>
+    ${nota?`<p class="nota">${nota}</p>`:''}`;
+  abrir('shDet');
 }
 
 function verAutos(){
