@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lider Bci">
-<title>Control tarjeta Lider Bci · Versión 13</title>
+<title>Control tarjeta Lider Bci · Versión 14</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -797,7 +797,8 @@ function home(){
         : `A pagar el<br><b>${E.C.ant.vence.getDate()} de ${MES[E.C.ant.vence.getMonth()]}</b><br>`+
           (E.diasPago<0?`<b class="urg">Venció hace ${plural(-E.diasPago,'día','días')}</b>`
             :E.diasPago===0?'<b class="urg">Vence hoy</b>'
-            :`<b${urg?' class="urg"':''}>Faltan ${plural(E.diasPago,'día','días')}</b>`)}${lineaInt(E.ant)}</div>
+            :`<b${urg?' class="urg"':''}>Faltan ${plural(E.diasPago,'día','días')}</b>`)+
+          (cuotasDe(E.C.ant)?`<br>+ cuota ${CLP(cuotasDe(E.C.ant))}`:'')}${lineaInt(E.ant)}</div>
       <button class="marcar${pagadoAnt?' off':''}" id="bPagar">
         ${pagadoAnt?'Desmarcar pago':'Marcar como pagado'}</button></div>
     <div class="cl b" data-det="act"><div class="lb">Ciclo actual</div>
