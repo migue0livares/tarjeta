@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lider Bci">
-<title>Control tarjeta Lider Bci · Versión 12</title>
+<title>Control tarjeta Lider Bci · Versión 13</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -411,6 +411,7 @@ select.inp{appearance:none;-webkit-appearance:none;
     <div class="hidden" id="aFilaDia">
       <div class="fila2"><select class="inp" id="aDia"></select>
         <div class="inp" style="color:var(--mut);font-weight:600">de cada mes</div></div>
+      <div id="aOrigenAuto"></div>
       <p class="paso" style="margin-top:16px">Desde cuándo está vigente</p>
       <input type="date" class="inp" id="aDesde">
     </div>
@@ -523,7 +524,7 @@ function materializar(){
     fechasSuscr(s,ini,h).forEach(f=>{
       const k=iso(f);
       if(MOVS.some(m=>m.d===k&&m.t===s.t)) return;
-      MOVS.push({c:s.c,t:s.t,d:k,a:s.a,q:1,n:0,auto:1});
+      MOVS.push({c:s.c,t:s.t,d:k,a:s.a,q:1,n:0,auto:1,...(s.i?{i:1}:{})});
       nuevos++;
     });
   });
@@ -539,7 +540,7 @@ function proyectados(){
       if(f<=h||f<ini) return;
       const k=iso(f);
       if(MOVS.some(m=>m.d===k&&m.t===s.t)) return;
-      out.push({c:s.c,t:s.t,d:k,a:s.a,q:1,auto:1});
+      out.push({c:s.c,t:s.t,d:k,a:s.a,q:1,auto:1,...(s.i?{i:1}:{})});
     });
   });
   return out.sort((a,b)=>a.d.localeCompare(b.d));
@@ -670,6 +671,10 @@ const progCiclo=r=>proyectados().filter(m=>enRango(m.d,r));
 const esInt=m=>!!(m&&m.i);
 const USD=n=>(n<0?'−':'')+'US$ '+Math.abs(n).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
 const dinero=m=>esInt(m)?USD(m.a):CLP(m.a);
+/* total mensual de los pagos automáticos: pesos y, si hay, dólares aparte */
+const totalAutos=()=>{const n=SUSCR.filter(x=>!x.i).reduce((a,x)=>a+x.a,0),
+  u=SUSCR.filter(x=>x.i).reduce((a,x)=>a+x.a,0);
+  return CLP(n)+(SUSCR.some(x=>x.i)?` + ${USD(u)}`:'')};
 const nacionales=l=>l.filter(m=>!esInt(m));
 const internacionales=l=>l.filter(esInt);
 const totalUSD=l=>Math.round(internacionales(l).reduce((s,m)=>s+m.a,0)*100)/100;
@@ -819,7 +824,7 @@ function home(){
   <button class="autos" id="verAutos">
     <span class="ic">🔁</span>
     <span class="tx"><b>Pagos automáticos</b>
-      <span>${SUSCR.length} activos · ${CLP(SUSCR.reduce((s,x)=>s+x.a,0))} al mes</span></span>
+      <span>${SUSCR.length} activos · ${totalAutos()} al mes</span></span>
     <span class="ar">›</span></button>
 
   <div class="ult">
@@ -912,7 +917,9 @@ function calendario(){
     const g=esInt(m)?usdDia:porDia;
     g[f.getDate()]=(g[f.getDate()]||0)+m.a});
   proyectados().forEach(m=>{const f=aFecha(m.d);
-    if(f.getFullYear()===calY&&f.getMonth()===calM) progDia[f.getDate()]=(progDia[f.getDate()]||0)+m.a});
+    if(f.getFullYear()!==calY||f.getMonth()!==calM) return;
+    const g=esInt(m)?usdDia:progDia;
+    g[f.getDate()]=(g[f.getDate()]||0)+m.a});
 
   let c='';
   for(let i=0;i<off;i++) c+='<div class="cell out"></div>';
@@ -1250,9 +1257,9 @@ function revisarAlta(){
                   (justoUSD(aMonto/100)?`<br><span class="justo">⚠️ ${AVISO_JUSTO}</span>`:'')
                 : `No suma al contador: equivale a menos de ${CLP(MIN_TX)} (dólar de referencia ${CLP(DOLAR_REF)}).`);
     } else if(aAuto){
-      elNota.innerHTML = cuenta
+      elNota.innerHTML = (aInt?'Se cobra en dólares y va al estado de cuenta internacional. El monto es aproximado: el banco convierte desde pesos y cambia un poco cada mes. ':'')+(cuenta
         ? `Se va a proyectar cada mes el día ${elDia.value} y <b>sumará al contador</b>.`
-        : `Se va a proyectar cada mes, pero <b>no suma al contador</b> por estar bajo los ${CLP(MIN_TX)}.`;
+        : `Se va a proyectar cada mes, pero <b>no suma al contador</b> por estar bajo los ${CLP(MIN_TX)}.`);
     } else {
       const q=+elCuo.value;
       elNota.innerHTML = cuenta
@@ -1271,8 +1278,9 @@ function modoAuto(on){
   /* los pagos automáticos no tienen devolución: el selector se oculta */
   document.getElementById('aTipo').classList.toggle('hidden',on);
   if(on && aDev) tipoDev(false);
-  /* los pagos automáticos son nacionales, en pesos (el selector está dentro de la fila que se oculta) */
-  if(on && aInt) origenInt(false);
+  /* el menú Nacional/Internacional se muestra en ambos modos: se mueve a la fila visible */
+  const o=document.getElementById('aOrigen');
+  if(on) document.getElementById('aOrigenAuto').appendChild(o); else elCuo.after(o);
 }
 function nuevaCompra(auto){
   aEdit=null; aSus=null; origenInt(false); aMonto=0;
@@ -1286,7 +1294,7 @@ function nuevaCompra(auto){
 }
 function editarSuscr(i){
   const s=SUSCR[i];
-  aEdit=null; aSus=i; origenInt(false); aMonto=s.a;
+  aEdit=null; aSus=i; origenInt(!!s.i); aMonto=s.i?Math.round(s.a*100):s.a;
   document.getElementById('addTit').textContent='Editar pago automático';
   elDet.value=s.t; elCat.value=s.c; elDia.value=String(s.dia);
   document.getElementById('aDesde').value=s.desde||iso(hoy());
@@ -1310,8 +1318,9 @@ function editar(i){
 }
 elGua.onclick=()=>{
   if(aAuto){
-    const s={c:elCat.value, t:elDet.value.trim(), dia:+elDia.value, a:aMonto,
+    const s={c:elCat.value, t:elDet.value.trim(), dia:+elDia.value, a:aInt?aMonto/100:aMonto,
       desde: document.getElementById('aDesde').value || iso(hoy())};
+    if(aInt) s.i=1;
     if(aSus===null) SUSCR.push(s); else SUSCR[aSus]=s;
     const n=materializar();
     guardar(); cerrar('shAdd'); paint();
@@ -1423,7 +1432,7 @@ function verDia(fISO){
     .sort((a,b)=>(b.m.h||'').localeCompare(a.m.h||''));
   const progs =proyectados().filter(m=>m.d===fISO);
   /* el total del día va en pesos; lo internacional se muestra aparte en dólares */
-  const total=nacionales(reales.map(x=>x.m)).reduce((s,m)=>s+m.a,0)+progs.reduce((s,m)=>s+m.a,0);
+  const total=nacionales(reales.map(x=>x.m)).reduce((s,m)=>s+m.a,0)+nacionales(progs).reduce((s,m)=>s+m.a,0);
   const usd=reales.some(x=>esInt(x.m)) ? totalUSD(reales.map(x=>x.m)) : null;
   const facturado = f<=E.C.ant.fin;
   const fila=(m,idx,prog)=>{const c=cat(m.c);
@@ -1515,9 +1524,9 @@ function textoMovimientos(){
 
   out.push('');
   out.push('══ PAGOS AUTOMÁTICOS ══');
-  if(SUSCR.length) SUSCR.forEach(s=>out.push(`  ${s.t} · ${CLP(s.a)} · día ${s.dia} de cada mes${s.desde?` · desde el ${fNum(s.desde)}`:''} · ${cat(s.c).nm}`));
+  if(SUSCR.length) SUSCR.forEach(s=>out.push(`  ${s.t} · ${dinero(s)}${s.i?' (internacional, aprox.)':''} · día ${s.dia} de cada mes${s.desde?` · desde el ${fNum(s.desde)}`:''} · ${cat(s.c).nm}`));
   else out.push('  Sin pagos automáticos');
-  out.push(`  Total mensual: ${CLP(SUSCR.reduce((s,x)=>s+x.a,0))}`);
+  out.push(`  Total mensual: ${totalAutos()}`);
 
   out.push('');
   out.push('══ CICLOS MARCADOS COMO PAGADOS ══');
@@ -1699,20 +1708,19 @@ function verDeuda(k){
 function verAutos(){
   const C=ciclos().act, h=hoy();
   const fila=(s,i)=>{const c=cat(s.c);
-    const cuenta=s.a>=MIN_TX;
+    const cuenta=cuentaTx(s);
     return `<button class="mv" data-sus="${i}" style="margin-bottom:8px">
       <span class="ic" style="background:${c.col}">${c.em}</span>
       <span class="i"><b>${s.t}</b><span class="f">Día ${s.dia} de cada mes${s.desde?` · desde el ${fLargo(s.desde).toLowerCase()}`:''}</span>
-        <span class="c">${c.nm}${cuenta?'':' · no suma al contador'}</span></span>
-      <span class="r"><b>${CLP(s.a)}</b><span>mensual</span></span></button>`};
-  const total=SUSCR.reduce((s,x)=>s+x.a,0);
-  const cuentan=SUSCR.filter(s=>s.a>=MIN_TX).length;
+        <span class="c">${s.i?'🌎 en dólares · ':''}${c.nm}${cuenta?'':' · no suma al contador'}</span></span>
+      <span class="r"><b>${dinero(s)}</b><span>${s.i?'mensual aprox.':'mensual'}</span></span></button>`};
+  const cuentan=SUSCR.filter(cuentaTx).length;
   document.getElementById('detBody').innerHTML=`
     <div class="det" style="padding-bottom:2px">
       <div class="ic" style="background:#E2F0EA">🔁</div>
       <h2>Pagos automáticos</h2>
       <div class="f">Se repiten todos los meses</div>
-      <div class="mo num">${CLP(total)}</div>
+      <div class="mo num">${totalAutos()}</div>
       <span class="st ok">${cuentan} de ${SUSCR.length} suman al contador</span></div>
     <div style="margin-top:18px">${SUSCR.map(fila).join('')||'<p class="vacio">Sin pagos automáticos todavía.</p>'}</div>
     <button class="btn go" id="dNuevoAuto">Agregar pago automático</button>`;
