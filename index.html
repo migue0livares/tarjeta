@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lider Bci">
-<title>Control tarjeta Lider Bci · Versión 10</title>
+<title>Control tarjeta Lider Bci · Versión 12</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -379,9 +379,7 @@ select.inp{appearance:none;-webkit-appearance:none;
     <div class="seg" id="aTipo" style="margin:4px 0 0">
       <button type="button" data-tipo="compra" aria-pressed="true">🛒 Compra</button>
       <button type="button" data-tipo="dev" aria-pressed="false">↩️ Devolución</button></div>
-    <div class="seg" id="aOrigen" style="margin:8px 0 0">
-      <button type="button" data-org="nac" aria-pressed="true">🇨🇱 Nacional · $</button>
-      <button type="button" data-org="int" aria-pressed="false">🌎 Internacional · US$</button></div>
+    <select class="inp hidden" id="aRef" style="margin-top:8px" aria-label="Compra a la que corresponde"></select>
     <p class="paso" id="aPaso1">1 · Cuánto pagaste</p>
     <div class="monto"><span class="cu" id="aCu">$</span><span class="vl cero" id="aVal">0</span></div>
     <div class="keys" id="aKeys"></div>
@@ -393,7 +391,7 @@ select.inp{appearance:none;-webkit-appearance:none;
     <select class="inp" id="aCat"></select>
     <button class="tgl" id="aAuto" aria-pressed="false">
       <span class="bx">✓</span><span id="aAutoTx">Es un pago automático que se repite cada mes</span></button>
-    <p class="paso" id="aPasoF">Fecha, hora y cuotas</p>
+    <p class="paso" id="aPasoF">Fecha, hora, cuotas y origen</p>
     <div id="aFila">
       <div class="fila2">
         <input type="date" class="inp" id="aFec" aria-label="Fecha">
@@ -404,6 +402,10 @@ select.inp{appearance:none;-webkit-appearance:none;
         <option value="1">1 cuota</option><option value="3">3 cuotas</option>
         <option value="6">6 cuotas</option><option value="10">10 cuotas</option>
         <option value="12">12 cuotas</option><option value="24">24 cuotas</option>
+      </select>
+      <select class="inp" id="aOrigen" style="margin-top:9px" aria-label="Nacional o internacional">
+        <option value="nac">🇨🇱 Nacional · en pesos</option>
+        <option value="int">🌎 Internacional · en dólares</option>
       </select>
     </div>
     <div class="hidden" id="aFilaDia">
@@ -682,6 +684,12 @@ const AVISO_JUSTO=`Está justo en el límite: el banco no publica qué dólar us
 /* lo que se factura en pesos: solo compras nacionales (sin cambios para ellas) */
 const facturable=l=>nacionales(l).filter(m=>m.q<2).reduce((s,m)=>s+m.a,0);
 /* etiqueta bajo el monto: lo que aún no ocurre manda sobre todo lo demás */
+/* devolución asociada a una compra: la devolución guarda r = clave de la compra.
+   La clave es fecha|hora|detalle|monto; si editas la compra, sus devoluciones se actualizan */
+const claveMov=m=>[m.d,m.h||'',m.t,m.a].join('|');
+const devsDe=m=>{const k=claveMov(m); return MOVS.filter(x=>x.a<0&&x.r===k)};
+const compraDe=dev=>dev.r ? MOVS.find(x=>x.a>0&&claveMov(x)===dev.r)||null : null;
+const marcaDev=(m,prog)=>!prog&&m.a>0&&devsDe(m).length?' · ↩️ devuelta':'';
 const etiqueta=(m,prog)=>prog?'Pago programado'
   :(m.a<0?'Devolución':esInt(m)?'Internacional':m.auto?'Suscripción':(m.q===1?'1 cuota':m.q+' cuotas'));
 /* monto con color verde si es devolución (negativo) */
@@ -738,7 +746,7 @@ function filaMov(m,idx,prog){
   return `<button class="mv${prog?' prog':''}${m.a<0?' dev':''}" ${prog?'':`data-i="${idx}"`}>
     <span class="ic" style="background:${c.col}">${c.em}</span>
     <span class="i"><b>${m.t}</b><span class="f">${fLargo(m.d)}${m.h?` · ${m.h}`:''}</span><span class="c">${c.nm}</span></span>
-    <span class="r"><b>${dinero(m)}</b><span>${etiqueta(m,prog)}</span></span>
+    <span class="r"><b>${dinero(m)}</b><span>${etiqueta(m,prog)}${marcaDev(m,prog)}</span></span>
   </button>`;
 }
 
@@ -1051,8 +1059,14 @@ function verDetalle(i){
   if(m.n) rows.push(['Monto real de la cuenta',CLP(m.n)],
     ['Comisión de plataforma',`${CLP(m.a-m.n)} · ${((m.a-m.n)/m.n*100).toFixed(2)}%`]);
   rows.push(['Origen', esInt(m)?'🌎 Internacional · en dólares':'🇨🇱 Nacional · en pesos']);
-  if(m.a<0) rows.push(['Tipo','Devolución · resta del total']);
-  else if(m.auto) rows.push(['Tipo','Suscripción mensual']);
+  if(m.a<0){
+    rows.push(['Tipo','Devolución · resta del total']);
+    const o=compraDe(m);
+    rows.push(['Corresponde a', o ? `${o.t} · ${fCorto(aFecha(o.d))} · ${dinero(o)}` : 'Sin compra asociada']);
+  } else {
+    if(m.auto) rows.push(['Tipo','Suscripción mensual']);
+    devsDe(m).forEach(x=>rows.push(['↩️ Devuelto', `${dinero({...x,a:-x.a})} el ${fCorto(aFecha(x.d))}`]));
+  }
   rows.push(['Suma al contador', m.a<0?'No, es una devolución'
     : cuentaTx(m)?(esInt(m)&&justoUSD(m.a)?'Sí, pero justo en el límite ⚠️':'Sí'):`No, es menos de ${CLP(MIN_TX)}`]);
   rows.push([(m.a<0?'Se descuenta en el pago del':'Se paga el')+(esInt(m)?' (en dólares)':''), facturado
@@ -1108,11 +1122,30 @@ function tipoDev(on){
   if(on) elCuo.value='1';
   elCuo.classList.toggle('hidden',on||aInt);
   elAuto.classList.toggle('hidden',on);
-  if(!aAuto) document.getElementById('aPasoF').textContent = (on||aInt)?'Fecha y hora':'Fecha, hora y cuotas';
+  elRef.classList.toggle('hidden',!on);
+  if(on && aEdit===null) llenarRef('');
+  pasoF();
   const t=document.getElementById('addTit');
   if(aEdit!==null) t.textContent = on?'Editar devolución':'Editar compra';
   else if(!aAuto) t.textContent = on?'Nueva devolución':'Nueva compra';
 }
+/* menú de compras para asociar la devolución: las de los últimos 3 ciclos, más nueva primero */
+const elRef=document.getElementById('aRef');
+function llenarRef(sel){
+  const C=ciclos();
+  const desde=iso(cicloIniDe(new Date(C.ant.ini.getFullYear(),C.ant.ini.getMonth(),C.ant.ini.getDate()-1)));
+  const lista=MOVS.filter(m=>m.a>0 && (m.d>=desde || claveMov(m)===sel))
+    .sort((a,b)=>(b.d+(b.h||'')).localeCompare(a.d+(a.h||'')));
+  elRef.innerHTML='<option value="">Sin compra asociada</option>'+
+    lista.map(m=>{const k=claveMov(m).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      return `<option value="${k}">${fCorto(aFecha(m.d))} · ${m.t} · ${dinero(m)}</option>`}).join('');
+  elRef.value=sel||'';
+}
+elRef.onchange=()=>{
+  const o=MOVS.find(m=>m.a>0&&claveMov(m)===elRef.value);
+  if(o){ elDet.value='Devolución: '+o.t; elCat.value=o.c; }
+  revisarAlta();
+};
 document.getElementById('aTipo').onclick=e=>{
   const b=e.target.closest('[data-tipo]'); if(!b) return;
   tipoDev(b.dataset.tipo==='dev'); revisarAlta();
@@ -1133,23 +1166,29 @@ function pintarMonto(){
   elVal.classList.toggle('cero',aMonto===0);
   document.getElementById('aCu').textContent = (aDev?'−':'')+(aInt?'US$':'$');
 }
+/* título del paso de fecha: dice "cuotas" solo cuando el selector de cuotas se ve */
+function pasoF(){
+  if(aAuto) return;
+  document.getElementById('aPasoF').textContent =
+    (aDev||aInt) ? 'Fecha, hora y origen' : 'Fecha, hora, cuotas y origen';
+}
 function origenInt(on){
-  if(on!==aInt) aMonto=0;            // cambiar de moneda borra el monto escrito
+  /* cambiar de moneda conserva el número escrito: $53 pasa a US$53,00 y al revés */
+  if(on&&!aInt) aMonto=Math.min(aMonto*100,99999999);
+  else if(!on&&aInt) aMonto=Math.round(aMonto/100);
   aInt=on;
-  document.querySelectorAll('#aOrigen button').forEach(b=>
-    b.setAttribute('aria-pressed', (b.dataset.org==='int')===on));
+  document.getElementById('aOrigen').value = on?'int':'nac';
   /* en dólares la tecla "000" pasa a ser "00" (centavos) */
   const k3=document.querySelector('#aKeys button[data-k="000"],#aKeys button[data-k="00"]');
   if(k3){ k3.dataset.k=on?'00':'000'; k3.textContent=k3.dataset.k; }
   /* las compras internacionales van en 1 cuota */
   if(on) elCuo.value='1';
   elCuo.classList.toggle('hidden',on||aDev);
-  if(!aAuto) document.getElementById('aPasoF').textContent = (on||aDev)?'Fecha y hora':'Fecha, hora y cuotas';
+  pasoF();
   pintarMonto();
 }
-document.getElementById('aOrigen').onclick=e=>{
-  const b=e.target.closest('[data-org]'); if(!b) return;
-  origenInt(b.dataset.org==='int'); revisarAlta();
+document.getElementById('aOrigen').onchange=e=>{
+  origenInt(e.target.value==='int'); revisarAlta();
 };
 
 /* una tecla del monto, venga del botón en pantalla o del teclado físico */
@@ -1228,12 +1267,11 @@ function modoAuto(on){
   aAuto=on; elAuto.setAttribute('aria-pressed',on);
   document.getElementById('aFila').classList.toggle('hidden',on);
   document.getElementById('aFilaDia').classList.toggle('hidden',!on);
-  document.getElementById('aPasoF').textContent = on?'Qué día cobra':'Fecha, hora y cuotas';
+  document.getElementById('aPasoF').textContent = 'Qué día cobra'; if(!on) pasoF();
   /* los pagos automáticos no tienen devolución: el selector se oculta */
   document.getElementById('aTipo').classList.toggle('hidden',on);
   if(on && aDev) tipoDev(false);
-  /* los pagos automáticos son nacionales, en pesos */
-  document.getElementById('aOrigen').classList.toggle('hidden',on);
+  /* los pagos automáticos son nacionales, en pesos (el selector está dentro de la fila que se oculta) */
   if(on && aInt) origenInt(false);
 }
 function nuevaCompra(auto){
@@ -1266,6 +1304,7 @@ function editar(i){
   /* en dólares el monto se edita en centavos */
   aMonto=Math.round(Math.abs(m.a)*(esInt(m)?100:1));
   tipoDev(m.a<0);
+  if(m.a<0) llenarRef(m.r||'');
   document.getElementById('aBorrar').classList.remove('hidden');
   revisarAlta(); abrir('shAdd');
 }
@@ -1287,11 +1326,15 @@ elGua.onclick=()=>{
     a:aDev?-valor:valor, q:(aDev||aInt)?1:+elCuo.value, n:0};
   if(aInt) reg.i=1;
   if(elHor.value) reg.h=elHor.value;
+  if(aDev && elRef.value) reg.r=elRef.value;
   const nom=aDev?'Devolución':'Compra';
   if(aEdit===null){ MOVS.push(reg); aviso(nom+(aInt?' internacional':'')+' guardada.'); }
   else { const ant=MOVS[aEdit];
     if(!aDev && !aInt){ reg.n=ant.n; if(ant.cu) reg.cu=ant.cu; }
     if(ant.auto) reg.auto=1;
+    /* si cambió la compra, sus devoluciones siguen apuntando a ella */
+    if(ant.a>0){ const k0=claveMov(ant), k1=claveMov(reg);
+      if(k0!==k1) MOVS.forEach(x=>{ if(x.a<0&&x.r===k0){ if(reg.a>0) x.r=k1; else delete x.r; } }); }
     MOVS[aEdit]=reg; aviso(nom+' actualizada.'); }
   guardar(); cerrar('shAdd'); paint();
 };
@@ -1299,6 +1342,7 @@ document.getElementById('aBorrar').onclick=()=>{
   if(aSus!==null){ SUSCR.splice(aSus,1); guardar(); cerrar('shAdd'); paint();
     aviso('Pago automático eliminado.'); return; }
   const eraDev=MOVS[aEdit].a<0;
+  if(!eraDev){ const k=claveMov(MOVS[aEdit]); MOVS.forEach(x=>{ if(x.a<0&&x.r===k) delete x.r; }); }
   MOVS.splice(aEdit,1); guardar(); cerrar('shAdd'); paint();
   aviso(eraDev?'Devolución eliminada.':'Compra eliminada.');
 };
@@ -1386,7 +1430,7 @@ function verDia(fISO){
     return `<button class="mv${prog?' prog':''}${m.a<0?' dev':''}" ${prog?'':`data-i="${idx}"`} style="margin-bottom:8px">
       <span class="ic" style="background:${c.col}">${c.em}</span>
       <span class="i"><b>${m.t}</b><span class="c">${m.h?m.h+' · ':''}${c.nm}</span></span>
-      <span class="r"><b>${dinero(m)}</b><span>${etiqueta(m,prog)}</span></span></button>`};
+      <span class="r"><b>${dinero(m)}</b><span>${etiqueta(m,prog)}${marcaDev(m,prog)}</span></span></button>`};
   const esPago = f.getDate()===1, esCorte = f.getDate()===CORTE;
   document.getElementById('detBody').innerHTML=`
     <div class="det" style="padding-bottom:2px">
