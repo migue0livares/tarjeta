@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lider Bci">
-<title>Control tarjeta Lider Bci · Versión 3</title>
+<title>Control tarjeta Lider Bci · Versión 10</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,6 +34,7 @@
  --aviso:#FFF6E3; --aviso-ink:#7A5807;
  --corte:#FDF2E0; --corte-ink:#8A5D05;
  --ic-auto:#E2F0EA;
+ --int:#2F63B8; --int-bg:#E4ECF9;
  --sombra:rgba(27,26,24,.16); --velo:rgba(27,26,24,.45);
 }
 html[data-tema="oscuro"]{
@@ -55,6 +56,7 @@ html[data-tema="oscuro"]{
  --aviso:#38300F; --aviso-ink:#F0D48A;
  --corte:#3A2D10; --corte-ink:#F2C878;
  --ic-auto:#1D3A31;
+ --int:#8DB4F5; --int-bg:#1C2A42;
  --sombra:rgba(0,0,0,.55); --velo:rgba(0,0,0,.65);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -145,6 +147,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .sep .tot{font-size:12px;font-weight:800;white-space:nowrap}
 .sep.act .tx{color:var(--gdk)} .sep.act .ln{background:var(--gbg)} .sep.act .tot{color:var(--grn)}
 .sep.ant .tx{color:var(--rdk)} .sep.ant .ln{background:var(--rbg)} .sep.ant .tot{color:var(--red)}
+/* ciclos más antiguos o siguientes: tono neutro */
+.sep.old .tx{color:var(--mut)} .sep.old .ln{background:var(--line)} .sep.old .tot{color:var(--ink)}
+/* compras internacionales: bloque aparte, en azul */
+.sep.int{padding-top:10px}
+.sep.int .tx{color:var(--int)} .sep.int .ln{background:var(--int-bg)} .sep.int .tot{color:var(--int)}
+.tl .mk.int{background:var(--int-bg);color:var(--int)}
+.quedan{text-align:center;font-size:11.5px;color:var(--fnt);font-weight:600;margin:9px 0 0}
 .mv{display:flex;align-items:center;gap:13px;background:var(--card);border-radius:18px;
  padding:13px 15px;margin-bottom:9px;width:100%;text-align:left}
 .mv:active{background:var(--press)}
@@ -262,7 +271,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .sh .ph{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px;flex:none}
 .sh .ph h3{margin:0;font-size:18px;font-weight:800}
 .sh .ph button{font-size:14px;color:var(--mut);font-weight:700}
-.sh .bd{overflow-y:auto;padding:0 20px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+/* flex:1 + min-height:0 obligan a la zona de contenido a encogerse y hacer scroll
+   en todos los navegadores (Safari incluido); overscroll-behavior evita que
+   el rebote del iPhone arrastre la página de atrás */
+.sh .bd{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+ padding:0 20px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
 
 .det{text-align:center;padding:6px 0 4px}
 .det .ic{width:58px;height:58px;border-radius:20px;display:grid;place-items:center;
@@ -294,7 +307,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .keys button{background:var(--card);border-radius:18px;padding:16px 0;font-size:22px;font-weight:700;
  font-variant-numeric:tabular-nums;user-select:none}
-.keys button:active{background:var(--press2)}
+.keys button:active,.keys button.on{background:var(--press2)}
+/* devoluciones: monto negativo en verde, porque te devuelven plata */
+.neg{color:var(--grn)!important}
+.justo{display:inline-block;margin-top:6px;color:var(--aviso-ink)}
+.mv.dev .r b,.mv.dev .r span,.tl .it.dev .v b,.tl .it.dev .v span{color:var(--grn)}
+.mv.dev{box-shadow:inset 3px 0 0 var(--grn)}
+.monto.dev .vl,.monto.dev .cu{color:var(--grn)}
+.monto.dev .vl.cero{color:var(--placeholder)}
+/* aviso del teclado físico: solo en equipos con mouse (PC), no en el iPhone */
+.pista{display:none;text-align:center;font-size:11.5px;color:var(--fnt);font-weight:600;margin:10px 0 0}
+@media (hover:hover) and (pointer:fine){.pista{display:block}}
 .inp{width:100%;background:var(--card);border:none;border-radius:18px;padding:16px;
  font-size:15px;font-weight:600;font-family:inherit}
 .inp::placeholder{color:var(--fnt);font-weight:500}
@@ -353,9 +376,16 @@ select.inp{appearance:none;-webkit-appearance:none;
   <div class="grab"></div>
   <div class="ph"><h3 id="addTit">Nueva compra</h3><button data-cerrar>Cancelar</button></div>
   <div class="bd">
-    <p class="paso">1 · Cuánto pagaste</p>
-    <div class="monto"><span class="cu">$</span><span class="vl cero" id="aVal">0</span></div>
+    <div class="seg" id="aTipo" style="margin:4px 0 0">
+      <button type="button" data-tipo="compra" aria-pressed="true">🛒 Compra</button>
+      <button type="button" data-tipo="dev" aria-pressed="false">↩️ Devolución</button></div>
+    <div class="seg" id="aOrigen" style="margin:8px 0 0">
+      <button type="button" data-org="nac" aria-pressed="true">🇨🇱 Nacional · $</button>
+      <button type="button" data-org="int" aria-pressed="false">🌎 Internacional · US$</button></div>
+    <p class="paso" id="aPaso1">1 · Cuánto pagaste</p>
+    <div class="monto"><span class="cu" id="aCu">$</span><span class="vl cero" id="aVal">0</span></div>
     <div class="keys" id="aKeys"></div>
+    <p class="pista">También puedes escribir el monto con tu teclado · Enter para guardar</p>
     <p class="paso">2 · Qué compraste</p>
     <input type="text" class="inp" id="aDet" placeholder="Detalle de la compra"
       autocomplete="off" autocapitalize="sentences" enterkeyhint="done">
@@ -631,10 +661,31 @@ const enRango=(d,r)=>{const f=aFecha(d);return f>=r.ini && f<=r.fin};
 const delCiclo=r=>MOVS.filter(m=>enRango(m.d,r));
 const progCiclo=r=>proyectados().filter(m=>enRango(m.d,r));
 /* lo que se factura este ciclo excluye las compras en cuotas: esas se cobran de a una */
-const facturable=l=>l.filter(m=>m.q<2).reduce((s,m)=>s+m.a,0);
+/* ─── compras internacionales ───
+   Se marcan con i:1 y el monto (a) va en dólares, con centavos (ej. 12.99).
+   Se pagan aparte, en dólares: NO entran en los totales en pesos del ciclo.
+   Las compras sin i son nacionales, así que los datos antiguos no cambian. */
+const esInt=m=>!!(m&&m.i);
+const USD=n=>(n<0?'−':'')+'US$ '+Math.abs(n).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+const dinero=m=>esInt(m)?USD(m.a):CLP(m.a);
+const nacionales=l=>l.filter(m=>!esInt(m));
+const internacionales=l=>l.filter(esInt);
+const totalUSD=l=>Math.round(internacionales(l).reduce((s,m)=>s+m.a,0)*100)/100;
+/* el contador de comisión cero: una compra internacional cuenta si
+   equivale a $5.000 o más, usando un dólar de referencia */
+const DOLAR_REF=950;
+const cuentaTx=m=>m.a>0 && (esInt(m) ? m.a*DOLAR_REF>=MIN_TX : m.a>=MIN_TX);
+/* el banco no publica qué dólar usa para los $5.000: bajo este monto en USD la compra queda justa */
+const USD_SEGURO=6;
+const justoUSD=usd=>usd*DOLAR_REF>=MIN_TX && usd<USD_SEGURO;
+const AVISO_JUSTO=`Está justo en el límite: el banco no publica qué dólar usa, así que <b>puede que no la cuente</b>. Para ir seguro, desde ${'US$'}${USD_SEGURO}.`;
+/* lo que se factura en pesos: solo compras nacionales (sin cambios para ellas) */
+const facturable=l=>nacionales(l).filter(m=>m.q<2).reduce((s,m)=>s+m.a,0);
 /* etiqueta bajo el monto: lo que aún no ocurre manda sobre todo lo demás */
 const etiqueta=(m,prog)=>prog?'Pago programado'
-  :(m.auto?'Suscripción':(m.q===1?'1 cuota':m.q+' cuotas'));
+  :(m.a<0?'Devolución':esInt(m)?'Internacional':m.auto?'Suscripción':(m.q===1?'1 cuota':m.q+' cuotas'));
+/* monto con color verde si es devolución (negativo) */
+const montoHTML=m=>m.a<0?`<span class="neg">${dinero(m)}</span>`:dinero(m);
 /* el banco cobra interés sobre las cuotas: si se conoce el valor real se usa ese */
 const valorCuota=m=>m.cu||Math.round(m.a/m.q);
 /* orden cronológico: fecha y, si existe, hora. Las compras sin hora quedan al final del día */
@@ -671,8 +722,8 @@ function pagoDelDia(f){
 function estado(){
   const C=ciclos(), h=hoy();
   const ant=delCiclo(C.ant), act=delCiclo(C.act), pr=progCiclo(C.act);
-  const hechas=act.filter(m=>m.a>=MIN_TX).length;
-  const progs =pr.filter(m=>m.a>=MIN_TX).length;
+  const hechas=act.filter(cuentaTx).length;
+  const progs =pr.filter(cuentaTx).length;
   return {C,h,ant,act,pr,
     deudaAnt:facturable(ant), deudaAct:facturable(act),
     cuota:cuotaMensual(),
@@ -684,17 +735,30 @@ function estado(){
 /* ─────────── render: inicio ─────────── */
 function filaMov(m,idx,prog){
   const c=cat(m.c);
-  return `<button class="mv${prog?' prog':''}" ${prog?'':`data-i="${idx}"`}>
+  return `<button class="mv${prog?' prog':''}${m.a<0?' dev':''}" ${prog?'':`data-i="${idx}"`}>
     <span class="ic" style="background:${c.col}">${c.em}</span>
     <span class="i"><b>${m.t}</b><span class="f">${fLargo(m.d)}${m.h?` · ${m.h}`:''}</span><span class="c">${c.nm}</span></span>
-    <span class="r"><b>${CLP(m.a)}</b><span>${etiqueta(m,prog)}</span></span>
+    <span class="r"><b>${dinero(m)}</b><span>${etiqueta(m,prog)}</span></span>
   </button>`;
 }
+
+/* separador del bloque internacional dentro de un ciclo */
+const sepInt=l=>`<div class="sep int"><span class="tx">🌎 Internacional<small>Se paga aparte, en dólares</small></span>
+  <span class="ln"></span><span class="tot">${USD(totalUSD(l))}</span></div>`;
+/* filas de un ciclo: primero las nacionales y luego, separadas, las internacionales */
+const nacIdx=idx=>idx.filter(i=>!esInt(MOVS[i]));
+const intIdx=idx=>idx.filter(i=>esInt(MOVS[i]));
+const bloqueInt=idx=>{const x=intIdx(idx);
+  return x.length ? sepInt(x.map(i=>MOVS[i]))+x.map(i=>filaMov(MOVS[i],i)).join('') : ''};
+const filasCiclo=idx=>nacIdx(idx).map(i=>filaMov(MOVS[i],i)).join('')+bloqueInt(idx);
+/* línea de la tarjeta del inicio con lo internacional del ciclo */
+const lineaInt=l=>{const u=totalUSD(l); return internacionales(l).length?`<br>🌎 <b>${USD(u)}</b> aparte`:''};
 
 function home(){
   const E=estado();
   const ordena=l=>l.map(m=>MOVS.indexOf(m)).sort((a,b)=>claveOrden(MOVS[b]).localeCompare(claveOrden(MOVS[a])));
-  const iAct=ordena(E.act), iAnt=ordena(E.ant);
+  const iActT=ordena(E.act), iAntT=ordena(E.ant);
+  const iAct=nacIdx(iActT), iAnt=nacIdx(iAntT);   // nacionales; las internacionales van aparte
   const listo=E.hechas>=META;
   const pagadoAnt=estaPagado(E.C.ant.fin);
   const urg=E.diasPago<=5 && !pagadoAnt;
@@ -709,6 +773,8 @@ function home(){
   const sepAnt=`<div class="sep ant"><span class="tx">Corte ciclo anterior<small>${fCorto(E.C.ant.ini)} al ${fCorto(E.C.ant.fin)}</small></span>
     <span class="ln"></span><span class="tot">${CLP(E.deudaAnt)}</span></div>`;
 
+  const fut=ciclosFuera().futuros;
+
   return `<div class="duo">
     <div class="cl a${pagadoAnt?' ok':''}" data-det="ant"><div class="lb">Ciclo anterior</div>
       <div class="per">${fCorto(E.C.ant.ini)} al ${fCorto(E.C.ant.fin)}</div>
@@ -718,14 +784,14 @@ function home(){
         : `A pagar el<br><b>${E.C.ant.vence.getDate()} de ${MES[E.C.ant.vence.getMonth()]}</b><br>`+
           (E.diasPago<0?`<b class="urg">Venció hace ${plural(-E.diasPago,'día','días')}</b>`
             :E.diasPago===0?'<b class="urg">Vence hoy</b>'
-            :`<b${urg?' class="urg"':''}>Faltan ${plural(E.diasPago,'día','días')}</b>`)}</div>
+            :`<b${urg?' class="urg"':''}>Faltan ${plural(E.diasPago,'día','días')}</b>`)}${lineaInt(E.ant)}</div>
       <button class="marcar${pagadoAnt?' off':''}" id="bPagar">
         ${pagadoAnt?'Desmarcar pago':'Marcar como pagado'}</button></div>
     <div class="cl b" data-det="act"><div class="lb">Ciclo actual</div>
       <div class="per">${fCorto(E.C.act.ini)} al ${fCorto(E.C.act.fin)}</div>
       <div class="mo num">${CLP(E.deudaAct)}</div>
       <div class="pg">A pagar el<br><b>${E.C.act.vence.getDate()} de ${MES[E.C.act.vence.getMonth()]}</b>
-        ${E.cuota?`<br>+ cuota ${CLP(E.cuota)}`:''}</div></div>
+        ${E.cuota?`<br>+ cuota ${CLP(E.cuota)}`:''}${lineaInt(E.act)}</div></div>
   </div>
 
   <div class="cnt${listo?' listo':''}">
@@ -750,14 +816,65 @@ function home(){
 
   <div class="ult">
     <div class="uh"><h4>Compras</h4><span>${MOVS.length} en total</span></div>
+    ${fut.map(c=>sepCiclo(c)+filasCiclo(c.idx)).join('')}
     ${sepAct}
-    ${iAct.length?iAct.map(i=>filaMov(MOVS[i],i)).join(''):'<p class="vacio">Sin compras en este ciclo todavía.</p>'}
+    ${iAct.length?iAct.map(i=>filaMov(MOVS[i],i)).join(''):'<p class="vacio">Sin compras nacionales en este ciclo todavía.</p>'}
     ${E.pr.map(m=>filaMov(m,null,true)).join('')}
+    ${bloqueInt(iActT)}
     ${sepAnt}
     ${iAnt.slice(0,4).map(i=>filaMov(MOVS[i],i)).join('')}
     ${iAnt.length>4?`<button class="vermas" id="vermas">Ver ${iAnt.length-4} compras más ↓</button>
       <div id="resto" class="hidden">${iAnt.slice(4).map(i=>filaMov(MOVS[i],i)).join('')}</div>`:''}
+    ${bloqueInt(iAntT)}
+    <div id="viejos">${viejos()}</div>
   </div>`;
+}
+
+/* ─────────── ciclos fuera del actual y del anterior ───────────
+   Solo agrupa para mostrar: no cambia ningún cálculo de ciclos ni cuotas. */
+const PASO_CICLOS=2;      // cuántos ciclos antiguos se cargan por cada toque
+let verCiclos=0;          // cuántos ciclos antiguos están a la vista
+function ciclosFuera(){
+  const C=ciclos(), viejos={}, futuros={};
+  MOVS.forEach((m,i)=>{
+    const f=aFecha(m.d);
+    const g = f<C.ant.ini ? viejos : f>C.act.fin ? futuros : null;
+    if(!g) return;
+    const ini=cicloIniDe(f), k=iso(ini);
+    (g[k]=g[k]||{ini, fin:corteDe(f), idx:[]}).idx.push(i);
+  });
+  const lista=g=>Object.keys(g).sort().reverse().map(k=>{
+    g[k].idx.sort((a,b)=>claveOrden(MOVS[b]).localeCompare(claveOrden(MOVS[a])));
+    return g[k];
+  });
+  return {viejos:lista(viejos), futuros:lista(futuros)};
+}
+const anio=d=>d.getFullYear()!==hoy().getFullYear()?' '+d.getFullYear():'';
+function sepCiclo(c){
+  const l=c.idx.map(i=>MOVS[i]);
+  const est = c.ini>hoy() ? 'Ciclo siguiente' : estaPagado(c.fin) ? '✓ Pagado' : 'Por pagar';
+  return `<div class="sep old"><span class="tx">Ciclo ${fCorto(c.ini)} al ${fCorto(c.fin)}${anio(c.fin)}
+    <small>${est} · ${plural(l.length,'compra','compras')}</small></span>
+    <span class="ln"></span><span class="tot">${CLP(facturable(l))}</span></div>`;
+}
+/* ciclos antiguos a la vista + botón para cargar más */
+function viejos(){
+  const g=ciclosFuera().viejos, enLista=vista!=='home';
+  let html=g.slice(0,verCiclos).map(c=> enLista
+    ? `<div class="mk corte">${c.fin.getDate()} de ${MES[c.fin.getMonth()]}${anio(c.fin)} · corte de ciclo</div>`+
+      tlCiclo(c.idx.map(i=>MOVS[i]),false)
+    : sepCiclo(c)+filasCiclo(c.idx)).join('');
+  const resto=g.slice(verCiclos);
+  if(resto.length){
+    const sig=resto.slice(0,PASO_CICLOS);
+    const n=sig.reduce((s,c)=>s+c.idx.length,0);
+    const quedan=resto.reduce((s,c)=>s+c.idx.length,0);
+    html+=`<button class="vermas" data-mas>Cargar ${plural(sig.length,'ciclo anterior','ciclos anteriores')} · ${plural(n,'compra','compras')} ↓</button>
+      <p class="quedan">${quedan===1?'Queda':'Quedan'} ${plural(quedan,'compra más antigua','compras más antiguas')}</p>`;
+  } else if(g.length){
+    html+=`<p class="quedan">No hay compras más antiguas.</p>`;
+  }
+  return html;
 }
 
 /* ─────────── render: movimientos ─────────── */
@@ -779,27 +896,33 @@ function calendario(){
   const E=estado(), h=hoy();
   const first=new Date(calY,calM,1), last=new Date(calY,calM+1,0).getDate();
   const off=(first.getDay()+6)%7;
-  const porDia={}, progDia={};
+  const porDia={}, progDia={}, usdDia={};
+  /* pesos y dólares no se mezclan: el día muestra pesos y, si solo hay compras
+     internacionales, muestra el total en dólares */
   MOVS.forEach(m=>{const f=aFecha(m.d);
-    if(f.getFullYear()===calY&&f.getMonth()===calM) porDia[f.getDate()]=(porDia[f.getDate()]||0)+m.a});
+    if(f.getFullYear()!==calY||f.getMonth()!==calM) return;
+    const g=esInt(m)?usdDia:porDia;
+    g[f.getDate()]=(g[f.getDate()]||0)+m.a});
   proyectados().forEach(m=>{const f=aFecha(m.d);
     if(f.getFullYear()===calY&&f.getMonth()===calM) progDia[f.getDate()]=(progDia[f.getDate()]||0)+m.a});
 
   let c='';
   for(let i=0;i<off;i++) c+='<div class="cell out"></div>';
   for(let d=1;d<=last;d++){
-    const f=new Date(calY,calM,d), v=porDia[d], p=progDia[d];
+    const f=new Date(calY,calM,d), v=porDia[d], p=progDia[d], u=usdDia[d];
     let cls='cell', est='';
-    if(v!==undefined||p!==undefined){ est=estadoFecha(f); cls+=' '+est; }
+    if(v!==undefined||p!==undefined||u!==undefined){ est=estadoFecha(f); cls+=' '+est; }
     if(d===1) cls+=' pago';
     if(d===CORTE) cls+=' corte';
     if(iso(f)===iso(h)) cls+=' hoy';
     const pagar = pagoDelDia(f);
     if(pagar) cls+=' pagar';
-    const txt = v!==undefined?CLP(v) : (p!==undefined?CLP(p) : (pagar?CLP(pagar):''));
+    /* un día con solo compras internacionales muestra su total en dólares (redondeado) */
+    const txt = v!==undefined?CLP(v) : (p!==undefined?CLP(p) : (pagar?CLP(pagar)
+      : (u!==undefined?'US$'+Math.round(u).toLocaleString('es-CL'):'')));
     const mk = d===1?'Límite<br>pago' : d===CORTE?'Corte<br>ciclo' : '';
     const chk = est==='pagado' ? '<span class="chk">✓</span>' : '';
-    const hay = v!==undefined||p!==undefined||pagar;
+    const hay = v!==undefined||p!==undefined||u!==undefined||pagar;
     c+=`<div class="${cls}" ${hay?`data-dia="${iso(f)}"`:''}>
       ${mk?`<span class="mk">${mk}</span>`:chk}
       <span class="d">${d}</span>
@@ -820,30 +943,41 @@ function calendario(){
     </div></div>`;
 }
 
+const tlItem=(m,idx,gris)=>{const c=cat(m.c);
+  return `<button class="it${gris?' gris':''}${m.a<0?' dev':''}" ${gris?'':`data-i="${idx}"`}>
+    <span class="ic" style="background:${c.col}">${c.em}</span>
+    <span class="k"><b>${m.t}</b><span>${m.h?m.h+' · ':''}${c.nm}</span></span>
+    <span class="v"><b>${dinero(m)}</b><span>${etiqueta(m,gris)}</span></span></button>`};
+/* un ciclo en la vista Lista: nacionales por día y, aparte, las internacionales */
+function tlCiclo(lista,gris){
+  const x=internacionales(lista), n=nacionales(lista);
+  return (n.length||!x.length ? (n.length?tlBloque(n,gris):'<p class="vacio">Nada todavía.</p>') : '')+
+    (x.length ? `<div class="mk int">🌎 Internacional · ${USD(totalUSD(x))} · se paga aparte</div>`+tlBloque(x,gris) : '');
+}
+function tlBloque(lista,gris){
+  const fechas=[...new Set(lista.map(m=>m.d))].sort().reverse();
+  return fechas.map(f=>{
+    const g=lista.filter(m=>m.d===f).sort((a,b)=>(b.h||'').localeCompare(a.h||'')), d=aFecha(f);
+    return `<div class="dia${gris?' gris':''}${iso(d)===iso(hoy())?' hoy':''}">
+      <span class="fe"><span class="n">${d.getDate()}</span>
+        <span class="m">${MES[d.getMonth()].slice(0,3)}</span>
+        <span class="w">${cap(DOW[d.getDay()]).slice(0,3)}</span></span>
+      <span class="co">${g.map(m=>tlItem(m,MOVS.indexOf(m),gris)).join('')}</span></div>`;
+  }).join('');
+}
+
 function timeline(){
   const E=estado();
-  const it=(m,idx,gris)=>{const c=cat(m.c);
-    return `<button class="it${gris?' gris':''}" ${gris?'':`data-i="${idx}"`}>
-      <span class="ic" style="background:${c.col}">${c.em}</span>
-      <span class="k"><b>${m.t}</b><span>${m.h?m.h+' · ':''}${c.nm}</span></span>
-      <span class="v"><b>${CLP(m.a)}</b><span>${etiqueta(m,gris)}</span></span></button>`};
-  const bloque=(lista,gris)=>{
-    const fechas=[...new Set(lista.map(m=>m.d))].sort().reverse();
-    return fechas.map(f=>{
-      const g=lista.filter(m=>m.d===f).sort((a,b)=>(b.h||'').localeCompare(a.h||'')), d=aFecha(f);
-      return `<div class="dia${gris?' gris':''}${iso(d)===iso(hoy())?' hoy':''}">
-        <span class="fe"><span class="n">${d.getDate()}</span>
-          <span class="m">${MES[d.getMonth()].slice(0,3)}</span>
-          <span class="w">${cap(DOW[d.getDay()]).slice(0,3)}</span></span>
-        <span class="co">${g.map(m=>it(m,MOVS.indexOf(m),gris)).join('')}</span></div>`;
-    }).join('');
-  };
   const vacio='<p class="vacio">Nada todavía.</p>';
+  const fut=ciclosFuera().futuros;
   return `<div class="box tl">
-    ${E.pr.length?bloque(E.pr,true):''}
-    ${E.act.length?bloque(E.act,false):vacio}
+    ${fut.map(c=>tlCiclo(c.idx.map(i=>MOVS[i]),false)+
+      `<div class="mk corte">${c.ini.getDate()-1} de ${MES[c.ini.getMonth()]}${anio(c.ini)} · corte de ciclo</div>`).join('')}
+    ${E.pr.length?tlBloque(E.pr,true):''}
+    ${E.act.length?tlCiclo(E.act,false):vacio}
     <div class="mk corte">${E.C.ant.fin.getDate()} de ${MES[E.C.ant.fin.getMonth()]} · corte de ciclo</div>
-    ${E.ant.length?bloque(E.ant,false):vacio}</div>`;
+    ${E.ant.length?tlCiclo(E.ant,false):vacio}
+    <div id="viejos">${viejos()}</div></div>`;
 }
 
 /* ─────────── pintar ─────────── */
@@ -874,6 +1008,8 @@ function abrir(id){
   document.body.style.position='fixed';
   document.body.style.top=`-${scrollY}px`;
   document.body.style.left='0'; document.body.style.right='0';
+  /* suelta el foco del botón que abrió la hoja: así Enter no lo vuelve a apretar */
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.getElementById(id).classList.add('on');
 }
 function cerrar(id){
@@ -882,6 +1018,16 @@ function cerrar(id){
   document.body.style.left=''; document.body.style.right='';
   window.scrollTo(0,scrollY);
 }
+/* en PC la hoja es una columna angosta: si la rueda del mouse o el trackpad
+   se usan sobre el fondo oscuro, igual se desplaza el contenido de la hoja */
+document.querySelectorAll('.sh').forEach(sh=>sh.addEventListener('wheel',e=>{
+  const bd=sh.querySelector('.bd');
+  if(!bd || e.target.closest('.bd')) return;      // dentro de la hoja: scroll normal
+  e.preventDefault();
+  const k = e.deltaMode===1 ? 16 : e.deltaMode===2 ? bd.clientHeight : 1;
+  bd.scrollTop += e.deltaY*k;
+},{passive:false}));
+
 document.querySelectorAll('.sh').forEach(sh=>sh.addEventListener('click',e=>{
   if(e.target.closest('[data-cerrar]')||e.target.classList.contains('bk')){ cerrar(sh.id); return; }
   const su=e.target.closest('[data-sus]');
@@ -904,18 +1050,21 @@ function verDetalle(i){
   }
   if(m.n) rows.push(['Monto real de la cuenta',CLP(m.n)],
     ['Comisión de plataforma',`${CLP(m.a-m.n)} · ${((m.a-m.n)/m.n*100).toFixed(2)}%`]);
-  if(m.auto) rows.push(['Tipo','Suscripción mensual']);
-  rows.push(['Suma al contador', m.a>=MIN_TX?'Sí':`No, es menos de ${CLP(MIN_TX)}`]);
-  rows.push(['Se paga el', facturado
+  rows.push(['Origen', esInt(m)?'🌎 Internacional · en dólares':'🇨🇱 Nacional · en pesos']);
+  if(m.a<0) rows.push(['Tipo','Devolución · resta del total']);
+  else if(m.auto) rows.push(['Tipo','Suscripción mensual']);
+  rows.push(['Suma al contador', m.a<0?'No, es una devolución'
+    : cuentaTx(m)?(esInt(m)&&justoUSD(m.a)?'Sí, pero justo en el límite ⚠️':'Sí'):`No, es menos de ${CLP(MIN_TX)}`]);
+  rows.push([(m.a<0?'Se descuenta en el pago del':'Se paga el')+(esInt(m)?' (en dólares)':''), facturado
     ? `${E.C.ant.vence.getDate()} de ${MES[E.C.ant.vence.getMonth()]}`
     : `${E.C.act.vence.getDate()} de ${MES[E.C.act.vence.getMonth()]}`]);
   document.getElementById('detBody').innerHTML=`
     <div class="det"><div class="ic" style="background:${c.col}">${c.em}</div>
       <h2>${m.t}</h2><div class="f">${fLargo(m.d)}${m.h?` · ${m.h}`:''}</div>
-      <div class="mo num">${CLP(m.a)}</div>
+      <div class="mo num${m.a<0?' neg':''}">${dinero(m)}</div>
       <span class="st ${facturado?'ok':'pr'}">${facturado?'Ya facturada':'Por facturar'}</span></div>
     <div class="dl">${rows.map(r=>`<div class="dr"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('')}</div>
-    <button class="btn dark" id="dEditar">Editar compra</button>`;
+    <button class="btn dark" id="dEditar">${m.a<0?'Editar devolución':'Editar compra'}</button>`;
   abrir('shDet');
   document.getElementById('dEditar').onclick=()=>{cerrar('shDet');editar(i)};
 }
@@ -942,12 +1091,31 @@ elHor.addEventListener('input',()=>{aHorTocada=true});
 elFec.addEventListener('input',horaPorDefecto);
 document.getElementById('aHorX').onclick=()=>{elHor.value='';aHorTocada=true};
 elDia.innerHTML=Array.from({length:31},(_,i)=>`<option value="${i+1}">Día ${i+1}</option>`).join('');
-elAuto.onclick=()=>{
-  aAuto=!aAuto; elAuto.setAttribute('aria-pressed',aAuto);
-  document.getElementById('aFila').classList.toggle('hidden',aAuto);
-  document.getElementById('aFilaDia').classList.toggle('hidden',!aAuto);
-  document.getElementById('aPasoF').textContent = aAuto?'Qué día cobra':'Fecha, hora y cuotas';
-  revisarAlta();
+elAuto.onclick=()=>{ modoAuto(!aAuto); revisarAlta(); };
+
+/* ─── tipo de movimiento: compra o devolución ───
+   La devolución se guarda con el monto en negativo (a<0). No necesita campo nuevo,
+   así que los datos y respaldos antiguos siguen funcionando igual. */
+let aDev=false;
+function tipoDev(on){
+  aDev=on;
+  document.querySelectorAll('#aTipo button').forEach(b=>
+    b.setAttribute('aria-pressed', (b.dataset.tipo==='dev')===on));
+  document.querySelector('#shAdd .monto').classList.toggle('dev',on);
+  pintarMonto();
+  document.getElementById('aPaso1').textContent = on?'1 · Cuánto te devolvieron':'1 · Cuánto pagaste';
+  /* una devolución es siempre en 1 cuota y nunca es pago automático */
+  if(on) elCuo.value='1';
+  elCuo.classList.toggle('hidden',on||aInt);
+  elAuto.classList.toggle('hidden',on);
+  if(!aAuto) document.getElementById('aPasoF').textContent = (on||aInt)?'Fecha y hora':'Fecha, hora y cuotas';
+  const t=document.getElementById('addTit');
+  if(aEdit!==null) t.textContent = on?'Editar devolución':'Editar compra';
+  else if(!aAuto) t.textContent = on?'Nueva devolución':'Nueva compra';
+}
+document.getElementById('aTipo').onclick=e=>{
+  const b=e.target.closest('[data-tipo]'); if(!b) return;
+  tipoDev(b.dataset.tipo==='dev'); revisarAlta();
 };
 
 elCat.innerHTML='<option value="">Elegir categoría</option>'+
@@ -955,16 +1123,72 @@ elCat.innerHTML='<option value="">Elegir categoría</option>'+
 
 document.getElementById('aKeys').innerHTML=
   [1,2,3,4,5,6,7,8,9,'000',0,'⌫'].map(k=>`<button data-k="${k}">${k}</button>`).join('');
+/* ─── origen: nacional (pesos) o internacional (dólares) ───
+   En dólares, aMonto guarda CENTAVOS mientras escribes: 1299 se ve como 12,99 */
+let aInt=false;
+function pintarMonto(){
+  elVal.textContent = aInt
+    ? (aMonto/100).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})
+    : aMonto.toLocaleString('es-CL');
+  elVal.classList.toggle('cero',aMonto===0);
+  document.getElementById('aCu').textContent = (aDev?'−':'')+(aInt?'US$':'$');
+}
+function origenInt(on){
+  if(on!==aInt) aMonto=0;            // cambiar de moneda borra el monto escrito
+  aInt=on;
+  document.querySelectorAll('#aOrigen button').forEach(b=>
+    b.setAttribute('aria-pressed', (b.dataset.org==='int')===on));
+  /* en dólares la tecla "000" pasa a ser "00" (centavos) */
+  const k3=document.querySelector('#aKeys button[data-k="000"],#aKeys button[data-k="00"]');
+  if(k3){ k3.dataset.k=on?'00':'000'; k3.textContent=k3.dataset.k; }
+  /* las compras internacionales van en 1 cuota */
+  if(on) elCuo.value='1';
+  elCuo.classList.toggle('hidden',on||aDev);
+  if(!aAuto) document.getElementById('aPasoF').textContent = (on||aDev)?'Fecha y hora':'Fecha, hora y cuotas';
+  pintarMonto();
+}
+document.getElementById('aOrigen').onclick=e=>{
+  const b=e.target.closest('[data-org]'); if(!b) return;
+  origenInt(b.dataset.org==='int'); revisarAlta();
+};
+
+/* una tecla del monto, venga del botón en pantalla o del teclado físico */
+function teclaMonto(k){
+  let s=String(aMonto);
+  if(k==='⌫') s=s.slice(0,-1)||'0'; else if(s.length<8) s=(s==='0'?'':s)+k;
+  aMonto=parseInt(s.slice(0,8)||'0',10);
+  pintarMonto();
+  revisarAlta();
+}
 document.getElementById('aKeys').addEventListener('pointerdown',e=>{
   const b=e.target.closest('button'); if(!b) return;
   e.preventDefault();
-  let s=String(aMonto), k=b.dataset.k;
-  if(k==='⌫') s=s.slice(0,-1)||'0'; else if(s.length<8) s=(s==='0'?'':s)+k;
-  aMonto=parseInt(s.slice(0,8)||'0',10);
-  elVal.textContent=aMonto.toLocaleString('es-CL');
-  elVal.classList.toggle('cero',aMonto===0);
-  revisarAlta();
+  teclaMonto(b.dataset.k);
 },{passive:false});
+
+/* teclado físico en PC: dígitos, Backspace y Enter mientras la hoja está abierta.
+   Si estás escribiendo en el detalle, la fecha u otro campo, el teclado es de ese campo */
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('shAdd').classList.contains('on')) return;
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  const t=e.target instanceof Element ? e.target : document.body;
+  if(t.closest('input,textarea,select')) return;
+  let k=null;
+  if(/^[0-9]$/.test(e.key)) k=e.key;
+  else if(e.key==='Backspace') k='⌫';
+  if(k){
+    e.preventDefault(); teclaMonto(k);
+    /* el botón en pantalla se ilumina, como si lo hubieras tocado */
+    const b=document.querySelector(`#aKeys button[data-k="${k}"]`);
+    if(b){ b.classList.add('on'); setTimeout(()=>b.classList.remove('on'),120); }
+    return;
+  }
+  if(e.key==='Enter'){
+    if(t.closest('#shAdd button')) return;   // un botón de la hoja con foco: se activa ese
+    e.preventDefault();
+    if(!elGua.disabled) elGua.click(); else aviso(elGua.textContent+'.');
+  }
+});
 [elDet,elCat,elFec,elCuo,elDia].forEach(el=>el.addEventListener('input',revisarAlta));
 
 function revisarAlta(){
@@ -972,12 +1196,21 @@ function revisarAlta(){
   elGua.disabled=!ok;
   elGua.textContent = ok
     ? (aAuto ? (aSus===null?'Guardar pago automático':'Guardar cambios')
-             : (aEdit===null?'Guardar compra':'Guardar cambios'))
+             : (aEdit===null?(aDev?'Guardar devolución':'Guardar compra'):'Guardar cambios'))
     : (!aMonto?'Falta el monto':(!elDet.value.trim()?'Falta el detalle':'Falta la categoría'));
   if(aMonto>0){
-    const E=estado(), cuenta=aMonto>=MIN_TX;
+    const E=estado();
+    const cuenta = aInt ? aMonto/100*DOLAR_REF>=MIN_TX : aMonto>=MIN_TX;
+    const fmt = n => aInt ? USD(n/100) : CLP(n);
     elNota.classList.remove('hidden');
-    if(aAuto){
+    if(aDev && !aAuto){
+      elNota.innerHTML = `Se guarda como <b>${fmt(-aMonto)}</b> y se resta del total ${aInt?'internacional':'del ciclo'} de esa fecha. No suma al contador.`;
+    } else if(aInt && !aAuto){
+      elNota.innerHTML = `Se paga aparte, en dólares: <b>no se suma</b> al total en pesos del ciclo. `+
+        (cuenta ? `Suma al contador: quedarías en <b>${Math.min(E.hechas+(aEdit===null?1:0),META)} de ${META}</b>.`+
+                  (justoUSD(aMonto/100)?`<br><span class="justo">⚠️ ${AVISO_JUSTO}</span>`:'')
+                : `No suma al contador: equivale a menos de ${CLP(MIN_TX)} (dólar de referencia ${CLP(DOLAR_REF)}).`);
+    } else if(aAuto){
       elNota.innerHTML = cuenta
         ? `Se va a proyectar cada mes el día ${elDia.value} y <b>sumará al contador</b>.`
         : `Se va a proyectar cada mes, pero <b>no suma al contador</b> por estar bajo los ${CLP(MIN_TX)}.`;
@@ -996,37 +1229,43 @@ function modoAuto(on){
   document.getElementById('aFila').classList.toggle('hidden',on);
   document.getElementById('aFilaDia').classList.toggle('hidden',!on);
   document.getElementById('aPasoF').textContent = on?'Qué día cobra':'Fecha, hora y cuotas';
+  /* los pagos automáticos no tienen devolución: el selector se oculta */
+  document.getElementById('aTipo').classList.toggle('hidden',on);
+  if(on && aDev) tipoDev(false);
+  /* los pagos automáticos son nacionales, en pesos */
+  document.getElementById('aOrigen').classList.toggle('hidden',on);
+  if(on && aInt) origenInt(false);
 }
 function nuevaCompra(auto){
-  aEdit=null; aSus=null; aMonto=0;
+  aEdit=null; aSus=null; origenInt(false); aMonto=0;
   document.getElementById('addTit').textContent=auto?'Nuevo pago automático':'Nueva compra';
-  elVal.textContent='0'; elVal.classList.add('cero');
   elDet.value=''; elCat.value=''; elCuo.value='1'; elFec.value=iso(hoy());
   aHorTocada=false; horaPorDefecto();
   elDia.value=String(hoy().getDate()); document.getElementById('aDesde').value=iso(hoy());
-  modoAuto(!!auto);
+  modoAuto(!!auto); tipoDev(false);
   document.getElementById('aBorrar').classList.add('hidden');
   revisarAlta(); abrir('shAdd');
 }
 function editarSuscr(i){
   const s=SUSCR[i];
-  aEdit=null; aSus=i; aMonto=s.a;
+  aEdit=null; aSus=i; origenInt(false); aMonto=s.a;
   document.getElementById('addTit').textContent='Editar pago automático';
-  elVal.textContent=aMonto.toLocaleString('es-CL'); elVal.classList.remove('cero');
   elDet.value=s.t; elCat.value=s.c; elDia.value=String(s.dia);
   document.getElementById('aDesde').value=s.desde||iso(hoy());
-  modoAuto(true);
+  modoAuto(true); pintarMonto();
   document.getElementById('aBorrar').classList.remove('hidden');
   revisarAlta(); abrir('shAdd');
 }
 function editar(i){
   const m=MOVS[i];
-  aEdit=i; aSus=null; aMonto=Math.abs(m.a);
+  aEdit=i; aSus=null;
   document.getElementById('addTit').textContent='Editar compra';
-  elVal.textContent=aMonto.toLocaleString('es-CL'); elVal.classList.toggle('cero',aMonto===0);
   elDet.value=m.t; elCat.value=m.c; elCuo.value=String(m.q); elFec.value=m.d;
   elHor.value=m.h||''; aHorTocada=true;
-  modoAuto(false);
+  modoAuto(false); origenInt(esInt(m));
+  /* en dólares el monto se edita en centavos */
+  aMonto=Math.round(Math.abs(m.a)*(esInt(m)?100:1));
+  tipoDev(m.a<0);
   document.getElementById('aBorrar').classList.remove('hidden');
   revisarAlta(); abrir('shAdd');
 }
@@ -1041,24 +1280,32 @@ elGua.onclick=()=>{
       (n?` Se registraron ${plural(n,'cargo pasado','cargos pasados')}.`:''));
     return;
   }
+  /* devolución: monto en negativo y siempre 1 cuota.
+     internacional: monto en dólares (centavos ÷ 100), marca i:1 y 1 cuota */
+  const valor = aInt ? aMonto/100 : aMonto;
   const reg={c:elCat.value, t:elDet.value.trim(), d:elFec.value||iso(hoy()),
-    a:aMonto, q:+elCuo.value, n:0};
+    a:aDev?-valor:valor, q:(aDev||aInt)?1:+elCuo.value, n:0};
+  if(aInt) reg.i=1;
   if(elHor.value) reg.h=elHor.value;
-  if(aEdit===null){ MOVS.push(reg); aviso('Compra guardada.'); }
-  else { reg.n=MOVS[aEdit].n; if(MOVS[aEdit].cu) reg.cu=MOVS[aEdit].cu;
-    if(MOVS[aEdit].auto) reg.auto=1;
-    MOVS[aEdit]=reg; aviso('Compra actualizada.'); }
+  const nom=aDev?'Devolución':'Compra';
+  if(aEdit===null){ MOVS.push(reg); aviso(nom+(aInt?' internacional':'')+' guardada.'); }
+  else { const ant=MOVS[aEdit];
+    if(!aDev && !aInt){ reg.n=ant.n; if(ant.cu) reg.cu=ant.cu; }
+    if(ant.auto) reg.auto=1;
+    MOVS[aEdit]=reg; aviso(nom+' actualizada.'); }
   guardar(); cerrar('shAdd'); paint();
 };
 document.getElementById('aBorrar').onclick=()=>{
   if(aSus!==null){ SUSCR.splice(aSus,1); guardar(); cerrar('shAdd'); paint();
     aviso('Pago automático eliminado.'); return; }
-  MOVS.splice(aEdit,1); guardar(); cerrar('shAdd'); paint(); aviso('Compra eliminada.');
+  const eraDev=MOVS[aEdit].a<0;
+  MOVS.splice(aEdit,1); guardar(); cerrar('shAdd'); paint();
+  aviso(eraDev?'Devolución eliminada.':'Compra eliminada.');
 };
 
 /* ─────────── eventos ─────────── */
-document.getElementById('tHome').onclick=()=>{vista='home';paint()};
-document.getElementById('tMov').onclick=()=>{vista='mov';paint()};
+document.getElementById('tHome').onclick=()=>{vista='home';verCiclos=0;paint()};
+document.getElementById('tMov').onclick=()=>{vista='mov';verCiclos=0;paint()};
 document.getElementById('bAdd').onclick=()=>nuevaCompra(false);
 document.getElementById('bCfg').onclick=verAjustes;
 
@@ -1079,6 +1326,11 @@ document.getElementById('stage').addEventListener('click',e=>{
     if(calM<0){calM=11;calY--} if(calM>11){calM=0;calY++}
     paint(); return; }
   if(e.target.closest('#verAutos')){ verAutos(); return; }
+  /* carga progresiva: se agregan ciclos abajo sin mover la pantalla */
+  if(e.target.closest('[data-mas]')){
+    verCiclos+=PASO_CICLOS;
+    document.getElementById('viejos').innerHTML=viejos();
+    return; }
   const dd=e.target.closest('[data-dia]');
   if(dd){ verDia(dd.dataset.dia); return; }
   const sl=e.target.closest('[data-slot]');
@@ -1126,18 +1378,21 @@ function verDia(fISO){
   const reales=MOVS.map((m,i)=>({m,i})).filter(x=>x.m.d===fISO)
     .sort((a,b)=>(b.m.h||'').localeCompare(a.m.h||''));
   const progs =proyectados().filter(m=>m.d===fISO);
-  const total=reales.reduce((s,x)=>s+x.m.a,0)+progs.reduce((s,m)=>s+m.a,0);
+  /* el total del día va en pesos; lo internacional se muestra aparte en dólares */
+  const total=nacionales(reales.map(x=>x.m)).reduce((s,m)=>s+m.a,0)+progs.reduce((s,m)=>s+m.a,0);
+  const usd=reales.some(x=>esInt(x.m)) ? totalUSD(reales.map(x=>x.m)) : null;
   const facturado = f<=E.C.ant.fin;
   const fila=(m,idx,prog)=>{const c=cat(m.c);
-    return `<button class="mv${prog?' prog':''}" ${prog?'':`data-i="${idx}"`} style="margin-bottom:8px">
+    return `<button class="mv${prog?' prog':''}${m.a<0?' dev':''}" ${prog?'':`data-i="${idx}"`} style="margin-bottom:8px">
       <span class="ic" style="background:${c.col}">${c.em}</span>
       <span class="i"><b>${m.t}</b><span class="c">${m.h?m.h+' · ':''}${c.nm}</span></span>
-      <span class="r"><b>${CLP(m.a)}</b><span>${etiqueta(m,prog)}</span></span></button>`};
+      <span class="r"><b>${dinero(m)}</b><span>${etiqueta(m,prog)}</span></span></button>`};
   const esPago = f.getDate()===1, esCorte = f.getDate()===CORTE;
   document.getElementById('detBody').innerHTML=`
     <div class="det" style="padding-bottom:2px">
       <h2>${fLargo(fISO)}</h2>
-      <div class="mo num">${CLP(total)}</div>
+      <div class="mo num">${usd!==null&&total===0?USD(usd):CLP(total)}</div>
+      ${usd!==null&&total!==0?`<div class="f" style="color:var(--int);font-weight:800">+ ${USD(usd)} internacional</div>`:''}
       ${(()=>{const e=estadoFecha(f);
         const txt={futuro:'Aún no ocurre',actual:'Ciclo actual, por facturar',
           pagado:'✓ Ya pagado',porpagar:'Facturado y por pagar'}[e];
@@ -1154,6 +1409,94 @@ function verDia(fISO){
         ? `${E.C.ant.vence.getDate()} de ${MES[E.C.ant.vence.getMonth()]}`
         : `${E.C.act.vence.getDate()} de ${MES[E.C.act.vence.getMonth()]}`}</span></div></div>`;
   abrir('shDet');
+}
+
+/* ─────────── copiar movimientos APP ───────────
+   Texto legible, ciclo por ciclo, para compararlo con el estado de cuenta PDF.
+   Usa los mismos cálculos de la app (facturable, cuotas): no cambia ninguna cuenta.
+   Al final lleva los datos completos, así también sirve como respaldo. */
+const MARCA_DATOS='── DATOS PARA RESTAURAR (no editar) ──';
+const fNum=s=>{const d=aFecha(s);return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`};
+const fCiclo=d=>`${fCorto(d)} ${d.getFullYear()}`;
+function textoMovimientos(){
+  /* ciclos con compras o con cuotas que se cobran en ellos */
+  const cic={};
+  const agregar=ini=>{const k=iso(ini); if(cic[k]) return;
+    const fin=new Date(ini.getFullYear(),ini.getMonth()+1,CORTE);
+    cic[k]={ini, fin, vence:new Date(fin.getFullYear(),fin.getMonth()+1,1)}; };
+  MOVS.forEach(m=>{
+    const o=cicloIniDe(aFecha(m.d)); agregar(o);
+    if(m.q>1) for(let n=1;n<=m.q;n++) agregar(new Date(o.getFullYear(),o.getMonth()+n,CORTE+1));
+  });
+  const linea=m=>{
+    const tipo = m.a<0?'Devolución' : m.auto?'Automático' : (m.q>1?`${m.q} cuotas de ${CLP(valorCuota(m))}`:'1 cuota');
+    return `  ${fNum(m.d)}${m.h?' '+m.h:''} · ${m.t} · ${dinero(m)} · ${tipo}`+
+      (m.n?` · monto real ${CLP(m.n)}, comisión ${CLP(m.a-m.n)}`:'');
+  };
+  const h=hoy(), out=[];
+  const ahora=new Date();
+  out.push('MOVIMIENTOS APP · Control tarjeta Lider Bci');
+  out.push(`Copiado el ${ahora.getDate()} de ${MES[ahora.getMonth()]} de ${ahora.getFullYear()}, ${ahoraHM()}`);
+  out.push('Para comparar con el estado de cuenta PDF. Ciclos del más reciente al más antiguo.');
+  out.push(`${plural(MOVS.length,'movimiento','movimientos')} · ${plural(SUSCR.length,'pago automático','pagos automáticos')} · ${plural(PAGADOS.length,'ciclo marcado','ciclos marcados')} como pagado`);
+
+  Object.keys(cic).sort().reverse().forEach(k=>{
+    const r=cic[k];
+    const lista=MOVS.filter(m=>enRango(m.d,r)).sort((a,b)=>claveOrden(a).localeCompare(claveOrden(b)));
+    const nac=nacionales(lista), intl=internacionales(lista), cuo=cuotasVivas(r);
+    const est = r.ini>h ? 'Ciclo futuro' : r.fin>=h ? 'Ciclo actual, aún no cierra'
+      : estaPagado(r.fin) ? '✓ Marcado como pagado' : 'Por pagar';
+    out.push('');
+    out.push(`══ CICLO ${fCiclo(r.ini)} al ${fCiclo(r.fin)} · se paga el ${r.vence.getDate()} de ${MES[r.vence.getMonth()]} · ${est} ══`);
+    if(nac.length){
+      out.push('Nacional (pesos)');
+      nac.forEach(m=>out.push(linea(m)));
+      const dev=nac.filter(m=>m.a<0);
+      if(dev.length) out.push(`  Devoluciones del ciclo: ${CLP(dev.reduce((s,m)=>s+m.a,0))}`);
+      const enCuotas=nac.filter(m=>m.q>1);
+      if(enCuotas.length) out.push('  (las compras en cuotas no suman aquí: se cobran desde el ciclo siguiente)');
+    }
+    if(cuo.length){
+      out.push('Cuotas que se cobran en este ciclo');
+      cuo.forEach(m=>out.push(`  ${m.t} · cuota ${nroCuota(m,r)} de ${m.q} · ${CLP(valorCuota(m))} (compra del ${fNum(m.d)})`));
+    }
+    const compras=facturable(lista), cuotas=cuotasDe(r);
+    out.push(`Total en pesos: ${CLP(compras+cuotas)}`+(cuotas?` (compras ${CLP(compras)} + cuotas ${CLP(cuotas)})`:''));
+    if(intl.length){
+      out.push('Internacional (dólares, se paga aparte)');
+      intl.forEach(m=>out.push(linea(m)));
+      out.push(`Total en dólares: ${USD(totalUSD(intl))}`);
+    }
+  });
+
+  out.push('');
+  out.push('══ PAGOS AUTOMÁTICOS ══');
+  if(SUSCR.length) SUSCR.forEach(s=>out.push(`  ${s.t} · ${CLP(s.a)} · día ${s.dia} de cada mes${s.desde?` · desde el ${fNum(s.desde)}`:''} · ${cat(s.c).nm}`));
+  else out.push('  Sin pagos automáticos');
+  out.push(`  Total mensual: ${CLP(SUSCR.reduce((s,x)=>s+x.a,0))}`);
+
+  out.push('');
+  out.push('══ CICLOS MARCADOS COMO PAGADOS ══');
+  if(PAGADOS.length) PAGADOS.slice().sort().reverse().forEach(p=>{
+    const fin=aFecha(p), ini=new Date(fin.getFullYear(),fin.getMonth()-1,CORTE+1);
+    out.push(`  ✓ Ciclo ${fCiclo(ini)} al ${fCiclo(fin)}`);
+  });
+  else out.push('  Ninguno todavía');
+
+  out.push('');
+  out.push(MARCA_DATOS);
+  out.push(JSON.stringify(paquete()));
+  return out.join('\n');
+}
+/* lee un respaldo: el JSON solo (respaldos antiguos) o el texto de "Copiar movimientos APP" */
+function leerRespaldo(txt){
+  txt=String(txt||'').trim();
+  try{ return JSON.parse(txt); }catch(e){}
+  const i=txt.indexOf(MARCA_DATOS);
+  const desde = i>=0 ? txt.indexOf('{', i) : txt.indexOf('{');
+  const hasta = txt.lastIndexOf('}');
+  if(desde<0||hasta<desde) throw new Error('sin datos');
+  return JSON.parse(txt.slice(desde, hasta+1));
 }
 
 function verAjustes(){
@@ -1192,15 +1535,19 @@ function verAjustes(){
       <div class="dr"><span>Pagos automáticos</span><span>${SUSCR.length}</span></div>
       <div class="dr"><span>Último guardado</span><span>${guardadoEl}</span></div>
       <div class="dr"><span>Espacio usado</span><span>${peso} KB</span></div></div>
-    <button class="btn dark" id="cfgExp">Copiar respaldo</button>
+    <button class="btn dark" id="cfgExp">Copiar movimientos APP</button>
+    <p class="nota" style="margin-top:9px;background:var(--card);color:var(--mut)">Copia todos tus movimientos en texto, ciclo por ciclo,
+      para <b>compararlos con el estado de cuenta PDF</b>. Incluye devoluciones, compras internacionales,
+      cuotas, ciclos marcados como pagados y pagos automáticos. También sirve como respaldo:
+      se puede pegar en "Restaurar desde respaldo".</p>
     <button class="btn" style="background:var(--card);color:var(--ink)" id="cfgImp">Restaurar desde respaldo</button>
     <button class="btn danger" id="cfgReset">Volver a los datos de ejemplo</button>
     <div class="hidden" id="cfgZona" style="margin-top:14px">
-      <p class="paso">Pega aquí tu respaldo</p>
-      <textarea class="ta" id="cfgTa" placeholder='{"v":1,"movs":[...],"suscr":[...]}'></textarea>
+      <p class="paso">Pega aquí tu respaldo o tus movimientos APP</p>
+      <textarea class="ta" id="cfgTa" placeholder='Pega el texto completo de "Copiar movimientos APP" o un respaldo antiguo {"v":1,...}'></textarea>
       <button class="btn go" id="cfgOk">Restaurar</button>
     </div>
-    <p class="nota" style="margin-top:14px">Guarda el respaldo en tus notas de vez en cuando.
+    <p class="nota" style="margin-top:14px">Guarda tus movimientos APP en tus notas de vez en cuando.
       Si borras el historial de Safari o desinstalas la app, los datos se pierden.</p>`;
   abrir('shDet');
 
@@ -1230,8 +1577,8 @@ function verAjustes(){
   };
 
   document.getElementById('cfgExp').onclick=async()=>{
-    const txt=JSON.stringify({v:1,movs:MOVS,suscr:SUSCR});
-    try{ await navigator.clipboard.writeText(txt); aviso('Respaldo copiado al portapapeles.'); }
+    const txt=textoMovimientos();
+    try{ await navigator.clipboard.writeText(txt); aviso('Movimientos copiados. Pégalos en tus notas.'); }
     catch(e){
       const z=document.getElementById('cfgZona');
       z.classList.remove('hidden');
@@ -1247,10 +1594,12 @@ function verAjustes(){
   };
   document.getElementById('cfgOk').onclick=()=>{
     try{
-      const d=JSON.parse(document.getElementById('cfgTa').value.trim());
-      if(!Array.isArray(d.movs)) throw 0;
+      const d=leerRespaldo(document.getElementById('cfgTa').value);
+      if(!d||!Array.isArray(d.movs)) throw 0;
       MOVS=d.movs; SUSCR=Array.isArray(d.suscr)?d.suscr:[];
-      PAGADOS=Array.isArray(d.pagados)?d.pagados:[];
+      /* los respaldos antiguos (v:1) no traían los ciclos pagados:
+         en ese caso se conservan los que ya tienes marcados */
+      if(Array.isArray(d.pagados)) PAGADOS=d.pagados;
       guardar(); cerrar('shDet'); paint(); aviso('Respaldo restaurado.');
     }catch(e){ aviso('Ese texto no es un respaldo válido.'); }
   };
@@ -1262,8 +1611,11 @@ function verAjustes(){
 /* desglose de lo que suma cada tarjeta del inicio */
 function verDeuda(k){
   const E=estado(), ant=k==='ant', r=ant?E.C.ant:E.C.act;
-  const compras=MOVS.filter(m=>enRango(m.d,r)&&m.q<2)
+  const delR=MOVS.filter(m=>enRango(m.d,r))
     .sort((a,b)=>claveOrden(b).localeCompare(claveOrden(a)));
+  /* en pesos: solo nacionales (igual que antes). Las internacionales van aparte */
+  const compras=nacionales(delR).filter(m=>m.q<2);
+  const intl=internacionales(delR);
   const cuo=cuotasVivas(r);
   const totC=compras.reduce((s,m)=>s+m.a,0);
   const totQ=cuo.reduce((s,m)=>s+valorCuota(m),0);
@@ -1284,7 +1636,7 @@ function verDeuda(k){
       <div class="mo num">${CLP(total)}</div>
       <span class="st pr">${plural(compras.length,'compra','compras')}${cuo.length?` y ${plural(cuo.length,'cuota','cuotas')}`:''}</span></div>
     <p class="paso">Compras · ${CLP(totC)}</p>
-    <div class="dl">${compras.map(m=>fila(m.t,fLargo(m.d)+(m.auto?' · automático':''),CLP(m.a))).join('')
+    <div class="dl">${compras.map(m=>fila(m.t,fLargo(m.d)+(m.a<0?' · devolución':m.auto?' · automático':''),montoHTML(m))).join('')
       ||'<div class="dr"><span>Sin compras en este ciclo</span><span>$0</span></div>'}</div>
     ${cuo.length?`<p class="paso">Cuotas · ${CLP(totQ)}</p>
     <div class="dl">${cuo.map(m=>fila(m.t,`cuota ${nroCuota(m,r)} de ${m.q}`,CLP(valorCuota(m)))).join('')}</div>`:''}
@@ -1292,6 +1644,10 @@ function verDeuda(k){
     <div class="dl"><div class="dr"><span>Compras</span><span>${CLP(totC)}</span></div>
       ${cuo.length?`<div class="dr"><span>Cuotas</span><span>${CLP(totQ)}</span></div>`:''}
       <div class="dr"><span>Total</span><span>${CLP(total)}</span></div></div>
+    ${intl.length?`<p class="paso" style="color:var(--int)">🌎 Internacional · ${USD(totalUSD(intl))}</p>
+    <div class="dl">${intl.map(m=>fila(m.t,fLargo(m.d)+(m.a<0?' · devolución':''),montoHTML(m))).join('')}
+      <div class="dr"><span>Total en dólares</span><span>${USD(totalUSD(intl))}</span></div></div>
+    <p class="nota">Lo internacional se paga aparte, en dólares. No está incluido en el total en pesos.</p>`:''}
     ${nota?`<p class="nota">${nota}</p>`:''}`;
   abrir('shDet');
 }
@@ -1322,7 +1678,7 @@ function verAutos(){
 
 function verSlot(i){
   const E=estado();
-  const ocupados=[...E.act.filter(m=>m.a>=MIN_TX), ...E.pr.filter(m=>m.a>=MIN_TX)];
+  const ocupados=[...E.act.filter(cuentaTx), ...E.pr.filter(cuentaTx)];
   const m=ocupados[i];
   if(!m){
     document.getElementById('detBody').innerHTML=`
